@@ -3,11 +3,11 @@ hub/main.py
 FastAPI app for the Village Hub.
 Serves the complete offline-first API and rich PWA interface for rural households.
 Features:
+  - Sarvam AI 9 Indian Languages + English full-flow translation dropdown
   - Deterministic eligibility evaluator
   - Feature K suggestions with pathway guidance
   - Family health module (NIS immunization & NHM red flags)
   - Reminders scheduler with Fast-Forward simulation control
-  - Voice query assistant (Hindi & English)
   - Ed25519 verified Tier 0 broadcast packet ingestion
 """
 
@@ -31,6 +31,7 @@ from sqlalchemy.orm import Session
 load_dotenv()
 
 from shared.rule_engine import check_eligibility, compute_age, match_household
+from shared.sarvam_client import SARVAM_LANGUAGES, translate_with_sarvam
 from hub.db import (
     HubHealthRecord,
     HubHousehold,
@@ -58,7 +59,6 @@ transport = FileTransport()
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     init_db()
-    # Ingest any existing signed broadcast packets on startup
     count = transport.scan_and_ingest_all()
     if count > 0:
         print(f"[hub/startup] Ingested {count} broadcast packet(s).")
@@ -67,8 +67,8 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="AccessAI Village Hub",
-    description="Offline-First Village Hub for Rural Households (AVINYA 2K26).",
-    version="1.0.0",
+    description="Offline-First Village Hub for Rural Households (AVINYA 2K26) with Sarvam AI Indian Languages.",
+    version="1.1.0",
     lifespan=lifespan,
 )
 
@@ -106,14 +106,13 @@ class CreatePersonRequest(BaseModel):
     assets: list[str] = []
 
 
-class VoiceQueryRequest(BaseModel):
-    query: str
-    household_id: Optional[str] = None
-    person_id: Optional[str] = None
-    lang: str = "hi"
+class TranslateRequest(BaseModel):
+    text: str
+    target_lang: str
+    source_lang: str = "en"
 
 
-# ── Health & Transport ────────────────────────────────────────────────────────
+# ── Health, Transport & Sarvam Languages ──────────────────────────────────────
 
 @app.get("/health")
 def health():
@@ -122,7 +121,26 @@ def health():
         "service": "hub",
         "transport": os.getenv("HUB_TRANSPORT", "file"),
         "offline_mode": True,
+        "sarvam_languages_count": len(SARVAM_LANGUAGES),
         "timestamp": datetime.now(timezone.utc).isoformat(),
+    }
+
+
+@app.get("/api/languages")
+def get_languages():
+    """Returns the 9 Indian languages + English supported by Sarvam AI."""
+    return {"languages": SARVAM_LANGUAGES}
+
+
+@app.post("/api/translate")
+def translate_api(req: TranslateRequest):
+    """Translates text to any of the 9 Indian languages or English via Sarvam AI."""
+    translated = translate_with_sarvam(req.text, req.target_lang, req.source_lang)
+    return {
+        "original": req.text,
+        "translated": translated,
+        "target_lang": req.target_lang,
+        "engine": "sarvam-ai",
     }
 
 
@@ -154,6 +172,7 @@ def get_stats(db: Session = Depends(get_db)):
 @app.get("/api/opportunities")
 def list_opportunities(
     type: Optional[str] = None,
+    lang: Optional[str] = "hi",
     db: Session = Depends(get_db),
 ):
     query = db.query(HubOpportunity)
@@ -163,11 +182,17 @@ def list_opportunities(
 
     items = []
     for o in opps:
+        # Localized title
+        localized_title = o.title_hi if lang == "hi" and o.title_hi else o.title
+        if lang and lang not in ("en", "hi"):
+            localized_title = translate_with_sarvam(o.title, target_lang=lang)
+
         items.append({
             "id": o.id,
             "type": o.type,
             "title": o.title,
             "title_hi": o.title_hi,
+            "title_localized": localized_title,
             "org": o.org,
             "level": o.level,
             "geo_state": o.geo_state,
@@ -313,7 +338,6 @@ def match_household_route(hh_id: str, db: Session = Depends(get_db)):
 
     results_matrix = match_household(person_models, opp_models)
 
-    # Format result
     formatted = []
     for r in results_matrix:
         p_obj = next((m for m in members if m.id == r.person_id), None)
@@ -333,7 +357,11 @@ def match_household_route(hh_id: str, db: Session = Depends(get_db)):
 
 
 @app.get("/api/suggestions/{person_id}")
-def get_suggestions_route(person_id: str, db: Session = Depends(get_db)):
+def get_suggestions_route(
+    person_id: str,
+    lang: Optional[str] = "hi",
+    db: Session = Depends(get_db),
+):
     """Feature K: Returns ranked recommendations with 'Why this fits', pathways, and citations."""
     person = db.get(HubPerson, person_id)
     if not person:
@@ -341,6 +369,13 @@ def get_suggestions_route(person_id: str, db: Session = Depends(get_db)):
 
     opps = db.query(HubOpportunity).all()
     suggestions = generate_person_suggestions(person, opps)
+
+    # If non-English/non-Hindi language requested, translate dynamically
+    if lang and lang not in ("en", "hi"):
+        for s in suggestions:
+            s["title_localized"] = translate_with_sarvam(s["title"], target_lang=lang)
+            if s.get("why_fit"):
+                s["why_fit_localized"] = translate_with_sarvam(s["why_fit"], target_lang=lang)
 
     return {
         "person_id": person.id,
@@ -385,25 +420,11 @@ def get_reminders_route(
     }
 
 
-# ── Voice Assistant ───────────────────────────────────────────────────────────
-
-@app.post("/api/voice/query")
-def api_voice_query(req: VoiceQueryRequest):
-    """Processes spoken or typed query in Hindi/English with deterministic routing and synthesis."""
-    res = process_voice_query(
-        query_text=req.query,
-        household_id=req.household_id,
-        person_id=req.person_id,
-        lang=req.lang,
-    )
-    return res
-
-
 # ── PWA Frontend UI ───────────────────────────────────────────────────────────
 
 @app.get("/", response_class=HTMLResponse)
 def pwa_ui():
-    """Serves the rich PWA interface for the Village Hub."""
+    """Serves the rich PWA interface with Sarvam 9 Indian Languages + English dropdown."""
     return HTMLResponse(content=_HUB_PWA_HTML)
 
 
@@ -415,7 +436,7 @@ _HUB_PWA_HTML = """<!DOCTYPE html>
   <title>AccessAI Village Hub | ग्रामीण जन सेवा केंद्र</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Rozha+One&family=Outfit:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>
     :root {
       --bg: #090d16;
@@ -437,12 +458,12 @@ _HUB_PWA_HTML = """<!DOCTYPE html>
       color: var(--text);
       font-family: 'Plus Jakarta Sans', sans-serif;
       min-height: 100vh;
-      padding-bottom: 90px;
+      padding-bottom: 40px;
     }
     
     /* Top Header */
     .header {
-      background: rgba(11, 15, 25, 0.9);
+      background: rgba(11, 15, 25, 0.92);
       backdrop-filter: blur(16px);
       position: sticky;
       top: 0;
@@ -455,40 +476,40 @@ _HUB_PWA_HTML = """<!DOCTYPE html>
     }
     .brand { display: flex; align-items: center; gap: 12px; }
     .brand-icon {
-      width: 40px; height: 40px; border-radius: 12px;
+      width: 42px; height: 42px; border-radius: 12px;
       background: linear-gradient(135deg, #2563eb, #10b981);
       display: flex; align-items: center; justify-content: center;
-      font-size: 20px; box-shadow: 0 4px 16px var(--primary-glow);
+      font-size: 22px; box-shadow: 0 4px 16px var(--primary-glow);
     }
-    .brand-title { font-family: 'Outfit', sans-serif; font-size: 19px; font-weight: 800; letter-spacing: -0.5px; }
+    .brand-title { font-family: 'Outfit', sans-serif; font-size: 20px; font-weight: 800; letter-spacing: -0.5px; }
     .brand-sub { font-size: 11px; color: var(--text-muted); }
     
-    .lang-toggle {
-      background: rgba(255, 255, 255, 0.08);
-      border: 1px solid rgba(255, 255, 255, 0.15);
-      border-radius: 20px;
-      padding: 4px;
+    /* Right Corner Language Dropdown */
+    .lang-dropdown-container {
       display: flex;
-      gap: 4px;
+      align-items: center;
+      gap: 8px;
     }
-    .lang-btn {
-      background: transparent;
-      border: none;
-      color: var(--text-muted);
-      padding: 4px 10px;
-      border-radius: 16px;
-      font-size: 12px;
-      font-weight: 700;
-      cursor: pointer;
-      transition: all 0.2s;
-    }
-    .lang-btn.active {
-      background: var(--primary);
+    .lang-select {
+      background: rgba(22, 30, 49, 0.95);
+      border: 1px solid rgba(59, 130, 246, 0.4);
       color: #fff;
-      box-shadow: 0 2px 8px var(--primary-glow);
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      font-weight: 700;
+      font-size: 13px;
+      padding: 8px 14px;
+      border-radius: 14px;
+      outline: none;
+      cursor: pointer;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+      transition: all 0.2s ease;
+    }
+    .lang-select:focus, .lang-select:hover {
+      border-color: var(--primary);
+      box-shadow: 0 0 12px var(--primary-glow);
     }
     
-    .container { max-width: 900px; margin: 0 auto; padding: 20px; }
+    .container { max-width: 920px; margin: 0 auto; padding: 20px; }
     
     /* Tier Status Banner */
     .tier-banner {
@@ -590,62 +611,6 @@ _HUB_PWA_HTML = """<!DOCTYPE html>
       margin: 10px 0;
     }
     
-    /* Voice Assistant Bar */
-    .voice-bar {
-      background: rgba(11, 15, 25, 0.95);
-      backdrop-filter: blur(20px);
-      position: fixed;
-      bottom: 0;
-      left: 0;
-      right: 0;
-      padding: 12px 20px;
-      border-top: 1px solid var(--card-border);
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      max-width: 900px;
-      margin: 0 auto;
-      z-index: 100;
-    }
-    .mic-btn {
-      background: linear-gradient(135deg, #ef4444, #dc2626);
-      color: white;
-      border: none;
-      width: 48px;
-      height: 48px;
-      border-radius: 50%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 22px;
-      cursor: pointer;
-      box-shadow: 0 4px 16px rgba(239, 68, 68, 0.4);
-      transition: all 0.2s;
-    }
-    .mic-btn.recording {
-      animation: pulse 1.2s infinite;
-      background: #10b981;
-    }
-    .voice-input {
-      flex: 1;
-      background: rgba(255, 255, 255, 0.08);
-      border: 1px solid rgba(255, 255, 255, 0.12);
-      border-radius: 24px;
-      padding: 12px 18px;
-      color: #fff;
-      font-size: 14px;
-      outline: none;
-    }
-    .send-btn {
-      background: var(--primary);
-      color: #fff;
-      border: none;
-      padding: 10px 18px;
-      border-radius: 20px;
-      font-weight: 700;
-      cursor: pointer;
-    }
-    
     .disclaimer-alert {
       background: rgba(239, 68, 68, 0.1);
       border: 1px solid rgba(239, 68, 68, 0.3);
@@ -660,7 +625,7 @@ _HUB_PWA_HTML = """<!DOCTYPE html>
 </head>
 <body>
 
-  <!-- Top Header -->
+  <!-- Top Header with Right Corner Language Dropdown -->
   <div class="header">
     <div class="brand">
       <div class="brand-icon">🏛️</div>
@@ -669,9 +634,23 @@ _HUB_PWA_HTML = """<!DOCTYPE html>
         <div class="brand-sub" id="lbl-sub">ग्रामीण जन सुविधा एवं अवसर केंद्र</div>
       </div>
     </div>
-    <div class="lang-toggle">
-      <button class="lang-btn active" id="btn-hi" onclick="setLang('hi')">हिंदी</button>
-      <button class="lang-btn" id="btn-en" onclick="setLang('en')">EN</button>
+    
+    <!-- Right-most Sarvam AI 9 Indian Languages + English Selector -->
+    <div class="lang-dropdown-container">
+      <span style="font-size: 16px;">🌐</span>
+      <select id="global-lang-select" class="lang-select" onchange="setGlobalLang(this.value)">
+        <option value="hi" selected>🇮🇳 हिन्दी (Hindi)</option>
+        <option value="bn">🇮🇳 বাংলা (Bengali)</option>
+        <option value="te">🇮🇳 తెలుగు (Telugu)</option>
+        <option value="mr">🇮🇳 मराठी (Marathi)</option>
+        <option value="ta">🇮🇳 தமிழ் (Tamil)</option>
+        <option value="gu">🇮🇳 ગુજરાતી (Gujarati)</option>
+        <option value="kn">🇮🇳 ಕನ್ನಡ (Kannada)</option>
+        <option value="ml">🇮🇳 മലയാളം (Malayalam)</option>
+        <option value="pa">🇮🇳 ਪੰਜਾਬੀ (Punjabi)</option>
+        <option value="od">🇮🇳 ଓଡ଼ିଆ (Odia)</option>
+        <option value="en">🌐 English (EN)</option>
+      </select>
     </div>
   </div>
 
@@ -683,10 +662,10 @@ _HUB_PWA_HTML = """<!DOCTYPE html>
         <span style="font-size: 20px;">📡</span>
         <div>
           <div style="font-weight: 700; font-size: 13px;" id="lbl-tier">TIER 1 — गाँव का स्थानीय हब (ऑफलाइन सक्षम)</div>
-          <div style="font-size: 11px; color: var(--text-muted);" id="lbl-sync">रेडियो ब्रॉडकास्ट द्वारा सत्यापित पैकेट प्राप्त</div>
+          <div style="font-size: 11px; color: var(--text-muted);" id="lbl-sync">Sarvam AI बहुभाषी अनुवाद एवं रेडियो ब्रॉडकास्ट सुरक्षित</div>
         </div>
       </div>
-      <button onclick="scanBroadcast()" style="background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); color: #fff; padding: 6px 12px; border-radius: 12px; font-size: 12px; cursor: pointer;">🔄 रेडियो सिंक</button>
+      <button onclick="scanBroadcast()" id="btn-radio-sync" style="background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); color: #fff; padding: 6px 12px; border-radius: 12px; font-size: 12px; cursor: pointer;">🔄 रेडियो सिंक</button>
     </div>
 
     <!-- Navigation Grid -->
@@ -777,10 +756,10 @@ _HUB_PWA_HTML = """<!DOCTYPE html>
         </div>
         <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 12px;" id="lbl-ff-desc">भविष्य की अंतिम तिथियों और दस्तावेज़ तैयारी अलर्ट को तुरंत जांचने के लिए आगे बढ़ाएं:</p>
         <div style="display: flex; gap: 8px; flex-wrap: wrap;">
-          <button onclick="setFastForward(0)" class="lang-btn" style="background: rgba(255,255,255,0.1); color: #fff;">आज (0 दिन)</button>
-          <button onclick="setFastForward(10)" class="lang-btn" style="background: rgba(255,255,255,0.1); color: #fff;">+10 दिन आगे</button>
-          <button onclick="setFastForward(30)" class="lang-btn" style="background: rgba(255,255,255,0.1); color: #fff;">+30 दिन आगे</button>
-          <button onclick="setFastForward(60)" class="lang-btn" style="background: rgba(255,255,255,0.1); color: #fff;">+60 दिन आगे</button>
+          <button onclick="setFastForward(0)" id="btn-ff-0" style="background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.15); color: #fff; padding: 6px 12px; border-radius: 12px; font-size: 12px; cursor: pointer;">आज (0 दिन)</button>
+          <button onclick="setFastForward(10)" id="btn-ff-10" style="background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.15); color: #fff; padding: 6px 12px; border-radius: 12px; font-size: 12px; cursor: pointer;">+10 दिन आगे</button>
+          <button onclick="setFastForward(30)" id="btn-ff-30" style="background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.15); color: #fff; padding: 6px 12px; border-radius: 12px; font-size: 12px; cursor: pointer;">+30 दिन आगे</button>
+          <button onclick="setFastForward(60)" id="btn-ff-60" style="background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.15); color: #fff; padding: 6px 12px; border-radius: 12px; font-size: 12px; cursor: pointer;">+60 दिन आगे</button>
         </div>
       </div>
 
@@ -795,73 +774,191 @@ _HUB_PWA_HTML = """<!DOCTYPE html>
 
   </div>
 
-  <!-- Bottom Voice Assistant Bar -->
-  <div class="voice-bar">
-    <button class="mic-btn" id="mic-button" onclick="toggleMic()" title="बोलकर पूछें">🎙️</button>
-    <input type="text" id="voice-text" class="voice-input" placeholder="बोलें या टाइप करें: 'क्या मेरा बेटा आवेदन कर सकता है?'" onkeydown="if(event.key==='Enter') sendVoiceQuery()" />
-    <button class="send-btn" onclick="sendVoiceQuery()" id="btn-ask">पूछें</button>
-  </div>
-
-  <!-- Voice Response Modal -->
-  <div id="voice-modal" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.7); backdrop-filter: blur(10px); z-index: 200; align-items: center; justify-content: center; padding: 20px;">
-    <div class="card" style="max-width: 500px; width: 100%; border-color: var(--primary);">
-      <div style="display: flex; justify-content: space-between; align-items: center;">
-        <span style="font-weight: 700; font-size: 16px;">🎙️ AccessAI Voice Assistant</span>
-        <button onclick="closeVoiceModal()" style="background: transparent; border: none; color: #fff; font-size: 18px; cursor: pointer;">✕</button>
-      </div>
-      <div id="voice-modal-content" style="font-size: 14px; line-height: 1.5; color: #fff; margin: 12px 0;"></div>
-      <button onclick="playVoiceReply()" style="background: var(--primary); color: #fff; border: none; padding: 10px; border-radius: 12px; font-weight: 700; cursor: pointer;">🔊 दोबारा सुनें</button>
-    </div>
-  </div>
-
   <script>
     let currentLang = 'hi';
     let fastForwardDays = 0;
     let households = [];
     let allOpportunities = [];
-    let lastVoiceReplyText = '';
-    let recognition = null;
-    let isRecording = false;
 
-    // Initialize Web Speech Recognition if available
-    if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
-      const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
-      recognition = new SpeechRec();
-      recognition.continuous = false;
-      recognition.interimResults = false;
-      recognition.lang = 'hi-IN';
-
-      recognition.onstart = () => {
-        isRecording = true;
-        document.getElementById('mic-button').classList.add('recording');
-        document.getElementById('voice-text').placeholder = 'सुन रहे हैं... कृपया बोलें...';
-      };
-
-      recognition.onresult = (e) => {
-        const transcript = e.results[0][0].transcript;
-        document.getElementById('voice-text').value = transcript;
-        sendVoiceQuery();
-      };
-
-      recognition.onend = () => {
-        isRecording = false;
-        document.getElementById('mic-button').classList.remove('recording');
-        document.getElementById('voice-text').placeholder = currentLang === 'hi' ? 'बोलें या टाइप करें: क्या मेरा बेटा आवेदन कर सकता है?' : 'Ask: can my son apply?';
-      };
-    }
-
-    function toggleMic() {
-      if (!recognition) {
-        alert(currentLang === 'hi' ? 'आपके ब्राउज़र में माइक्रोफ़ोन पहचान उपलब्ध नहीं है। कृपया लिखकर पूछें।' : 'Speech recognition not supported in this browser. Please type.');
-        return;
+    // Multilingual UI Dictionary for Sarvam AI 9 Indian Languages + English
+    const I18N = {
+      sub_title: {
+        hi: "ग्रामीण जन सुविधा एवं अवसर केंद्र",
+        bn: "গ্রামীণ কল্যাণ ও সুযোগ কেন্দ্র",
+        te: "గ్రామీణ సంక్షేమం మరియు అవకాశాల కేంద్రం",
+        mr: "ग्रामीण कल्याण व संधी केंद्र",
+        ta: "கிராமப்புற நலன் மற்றும் வாய்ப்புகள் மையம்",
+        gu: "ગ્રામીણ કલ્યાણ અને તકો કેન્દ્ર",
+        kn: "ಗ್ರಾಮೀಣ ಕಲ್ಯಾಣ ಮತ್ತು ಅವಕಾಶಗಳ ಕೇಂದ್ರ",
+        ml: "ഗ്രാമീണ ക്ഷേമവും അവസരങ്ങളും കേന്ദ്രം",
+        pa: "ਪੇਂਡੂ ਭਲਾਈ ਅਤੇ ਮੌਕੇ ਕੇਂਦਰ",
+        od: "ଗ୍ରାମୀଣ କଲ୍ୟାଣ ଏବଂ ସୁଯୋଗ କେନ୍ଦ୍ର",
+        en: "Rural Welfare & Opportunities Hub"
+      },
+      tier: {
+        hi: "TIER 1 — गाँव का स्थानीय हब (ऑफलाइन सक्षम)",
+        bn: "TIER 1 — গ্রামের স্থানীয় হাব (অফলাইন সক্ষম)",
+        te: "TIER 1 — గ్రామ స్థానిక హబ్ (ఆఫ్‌లైన్ సదుపాయం)",
+        mr: "TIER 1 — गावाचे स्थानिक हब (ऑफलाइन सक्षम)",
+        ta: "TIER 1 — கிராமப்புற உள்ளூர் மையம் (ஆஃப்லைன் வசதி)",
+        gu: "TIER 1 — ગામનું સ્થાનિક હબ (ઑફલાઇન સક્ષમ)",
+        kn: "TIER 1 — ಗ್ರಾಮದ ಸ್ಥಳೀಯ ಹಬ್ (ಆಫ್‌ಲೈನ್ ಸಕ್ರಿಯ)",
+        ml: "TIER 1 — ഗ്രാമീണ ലോക്കൽ ഹബ്ബ് (ഓഫ്‌ലൈൻ സവിശേഷത)",
+        pa: "TIER 1 — ਪਿੰਡ ਦਾ ਸਥਾਨਕ ਹੱਬ (ਆਫਲਾਈਨ ਸਮਰੱਥ)",
+        od: "TIER 1 — ଗ୍ରାମୀଣ ସ୍ଥାନୀୟ ହବ୍ (ଅଫଲାଇନ୍ ସକ୍ଷମ)",
+        en: "TIER 1 — Village Hub (Offline Capable)"
+      },
+      sync_lbl: {
+        hi: "Sarvam AI बहुभाषी अनुवाद एवं रेडियो ब्रॉडकास्ट सुरक्षित",
+        bn: "Sarvam AI বহুভাষিক অনুবাদ এবং রেডিও সম্প্রচার সুরক্ষিত",
+        te: "Sarvam AI బహుభాషా అనువాదం మరియు రేడియో ప్రసారం సురక్షితం",
+        mr: "Sarvam AI बहुभाषिक भाषांतर व रेडिओ प्रसारण सुरक्षित",
+        ta: "Sarvam AI பன்மொழி மொழிபெயர்ப்பு மற்றும் வானொலி ஒளிபரப்பு பாதுகாப்பானது",
+        gu: "Sarvam AI બહુભાષી અનુવાદ અને રેડિયો પ્રસારણ સુરક્ષિત",
+        kn: "Sarvam AI ಬಹುಭಾಷಾ ಅನುವಾದ ಮತ್ತು ರೇಡಿಯೋ ಪ್ರಸಾರ ಸುರಕ್ಷಿತ",
+        ml: "Sarvam AI ബഹുഭാഷാ വിവർത്തനവും റേഡിയോ പ്രക്ഷേപണവും സുരക്ഷിതമാണ്",
+        pa: "Sarvam AI ਬਹੁਭਾਸ਼ਾਈ ਅਨੁਵਾਦ ਅਤੇ ਰੇਡੀਓ ਪ੍ਰਸਾਰਣ ਸੁਰੱਖਿਅਤ",
+        od: "Sarvam AI ବହୁଭାଷୀ ଅନୁବାଦ ଏବଂ ରେଡିଓ ପ୍ରସାରଣ ସୁରକ୍ଷିତ",
+        en: "Sarvam AI Multilingual Translation & Radio Verified"
+      },
+      tab_opps: {
+        hi: "योजनाएं एवं अवसर", bn: "পরিকল্পনা ও সুযোগ", te: "పథకాలు మరియు అవకాశాలు", mr: "योजना व संधी",
+        ta: "திட்டங்கள் மற்றும் வாய்ப்புகள்", gu: "યોજનાઓ અને તકો", kn: "ಯೋಜನೆಗಳು ಮತ್ತು ಅವಕಾಶಗಳು",
+        ml: "പദ്ധതികളും അവസരങ്ങളും", pa: "ਸਕੀਮਾਂ ਅਤੇ ਮੌਕੇ", od: "ଯୋଜନା ଏବଂ ସୁଯୋଗ", en: "Opportunities"
+      },
+      tab_opps_sub: {
+        hi: "सरकारी सूचनाएं", bn: "সরকারি বিজ্ঞপ্তি", te: "ప్రభుత్వ నోటీసులు", mr: "शासकीय सूचना",
+        ta: "அரசு அறிவிப்புகள்", gu: "સરકારી નોટિસો", kn: "ಸರ್ಕಾರಿ ಪ್ರಕಟಣೆಗಳು", ml: "സർക്കാർ വിജ്ഞാപനങ്ങൾ",
+        pa: "ਸਰਕਾਰੀ ਨੋਟਿਸ", od: "ସରକାରୀ ବିଜ୍ଞପ୍ତି", en: "Government Notices"
+      },
+      tab_sugg: {
+        hi: "आपके लिए सुझाव", bn: "আপনার জন্য পরামর্শ", te: "మీ కోసం సూచనలు", mr: "तुमच्यासाठी शिफारसी",
+        ta: "உங்களுக்கான பரிந்துரைகள்", gu: "તમારા માટે સૂચનો", kn: "ನಿಮಗಾಗಿ ಶಿಫಾರಸುಗಳು",
+        ml: "നിങ്ങൾക്കുള്ള നിർദ്ദേശങ്ങൾ", pa: "ਤੁਹਾਡੇ ਲਈ ਸੁਝਾਅ", od: "ଆପଣଙ୍କ ପାଇଁ ପରାମର୍ଶ", en: "Suggested for You"
+      },
+      tab_sugg_sub: {
+        hi: "योग्यता अनुसार", bn: "যোগ্যতা অনুযায়ী", te: "అర్హత ప్రకారం", mr: "पात्रतेनुसार",
+        ta: "தகுதிப்படி", gu: "લાયકાત મુજબ", kn: "ಅರ್ಹತೆಯಂತೆ", ml: "യോഗ്യതയനുസരിച്ച്",
+        pa: "ਯੋਗਤਾ ਅਨੁਸਾਰ", od: "ଯୋଗ୍ୟତା ଅନୁଯାୟୀ", en: "By Profile Fit"
+      },
+      tab_fam: {
+        hi: "मेरा परिवार", bn: "আমার পরিবার", te: "నా కుటుంబం", mr: "माझे कुटुंब",
+        ta: "என் குடும்பம்", gu: "મારો પરિવાર", kn: "ನನ್ನ ಕುಟುಂಬ", ml: "എന്റെ കുടുംബം",
+        pa: "ਮੇਰਾ ਪਰਿਵਾਰ", od: "ମୋର ପରିବାର", en: "My Family"
+      },
+      tab_fam_sub: {
+        hi: "प्रोफाइल व पात्रता", bn: "প্রোফাইল ও যোগ্যতা", te: "ప్రొఫైల్ మరియు అర్హత", mr: "प्रोफाइल व पात्रता",
+        ta: "சுயவிவரம் மற்றும் தகுதி", gu: "પ્રોફાઇલ અને લાયકાત", kn: "ಪ್ರೊಫೈಲ್ ಮತ್ತು ಅರ್ಹತೆ", ml: "പ്രൊഫൈലും യോഗ്യതയും",
+        pa: "ਪ੍ਰੋਫਾਈਲ ਅਤੇ ਯੋਗਤਾ", od: "ପ୍ରୋଫାଇଲ୍ ଏବଂ ଯୋଗ୍ୟତା", en: "Profiles & Eligibility"
+      },
+      tab_health: {
+        hi: "परिवार स्वास्थ्य", bn: "পারিবারিক স্বাস্থ্য", te: "కుటుంబ ఆరోగ్యం", mr: "कुटुंब आरोग्य",
+        ta: "குடும்ப சுகாதாரம்", gu: "પરિવાર સ્વાસ્થ્ય", kn: "ಕುಟುಂಬ ಆರೋಗ್ಯ", ml: "കുടുംബ ആരോഗ്യം",
+        pa: "ਪਰਿਵਾਰਕ ਸਿਹਤ", od: "ପରିବାର ସ୍ୱାସ୍ଥ୍ୟ", en: "Family Health"
+      },
+      tab_health_sub: {
+        hi: "टीकाकरण व सलाह", bn: "টিকাকরণ ও পরামর্শ", te: "టీకాలు మరియు సలహాలు", mr: "लसीकरण व सल्ला",
+        ta: "தடுப்பூசி மற்றும் ஆலோசனை", gu: "રસીકરણ અને સલાહ", kn: "ಲಸಿಕೆ ಮತ್ತು ಸಲಹೆ", ml: "പ്രതിരോധ കുത്തിവയ്പ്പും ഉപദേശവും",
+        pa: "ਟੀਕਾਕਰਨ ਅਤੇ ਸਲਾਹ", od: "ଟିକାକରଣ ଏବଂ ପରାମର୍ଶ", en: "Immunization & Guidance"
+      },
+      tab_rem: {
+        hi: "स्मरण व अलर्ट", bn: "অনুস্মারক ও সতর্কতা", te: "రిమైండర్లు మరియు హెచ్చరికలు", mr: "स्मरणपत्रे व सूचना",
+        ta: "நினைவூட்டல்கள் மற்றும் எச்சரிக்கைகள்", gu: "રીમાઇન્ડર અને ચેતવણીઓ", kn: "ಜ್ಞಾಪನೆಗಳು ಮತ್ತು ಎಚ್ಚರಿಕೆಗಳು",
+        ml: "ഓർമ്മപ്പെടുത്തലുകളും അലേർട്ടുകളും", pa: "ਯਾਦ-ਦਹਾਨੀਆਂ ਅਤੇ ਚਿਤਾਵਨੀਆਂ", od: "ସ୍ମାରକପତ୍ର ଏବଂ ସତର୍କତା", en: "Reminders & Alerts"
+      },
+      tab_rem_sub: {
+        hi: "अंतिम तिथियां", bn: "শেষ তারিখসমূহ", te: "గడువు తేదీలు", mr: "अंतिम तारखा",
+        ta: "கடைசி தேதிகள்", gu: "છેલ્લી તારીખો", kn: "ಕೊನೆಯ ದಿನಾಂಕಗಳು", ml: "അവസാന തീയതികൾ",
+        pa: "ਆਖਰੀ ਮਿਤੀਆਂ", od: "ଶେଷ ତାରିଖ", en: "Deadlines"
+      },
+      tab_dash: {
+        hi: "ग्राम डैशबोर्ड", bn: "গ্রাম ড্যাশবোর্ড", te: "గ్రామ డ్యాష్‌బోర్డ్", mr: "ग्राम डॅशबोर्ड",
+        ta: "கிராம டாஷ்போர்டு", gu: "ગ્રામ ડેશબોર્ડ", kn: "ಗ್ರಾಮ ಡ್ಯಾಶ್‌ಬೋರ್ಡ್", ml: "ഗ്രാമ ഡാഷ്‌ബോർഡ്",
+        pa: "ਪਿੰਡ ਡੈਸ਼ਬੋਰਡ", od: "ଗ୍ରାମ ଡ୍ୟାସବୋର୍ଡ", en: "Village Hub"
+      },
+      tab_dash_sub: {
+        hi: "हब स्थिति", bn: "হাব স্থিতি", te: "హబ్ స్థితి", mr: "हब स्थिती",
+        ta: "மைய நிலை", gu: "હબ સ્થિતિ", kn: "ಹಬ್ ಸ್ಥಿತಿ", ml: "ഹബ്ബ് അവസ്ഥ",
+        pa: "ਹੱਬ ਸਥਿਤੀ", od: "ହବ୍ ସ୍ଥିତି", en: "Status & Ledger"
+      },
+      hdr_opps: {
+        hi: "उपलब्ध सरकारी योजनाएं एवं नौकरियां", bn: "উপলব্ধ সরকারি প্রকল্প ও চাকরি", te: "అందుబాటులో ఉన్న ప్రభుత్వ పథకాలు మరియు ఉద్యోగాలు",
+        mr: "उपलब्ध शासकीय योजना व नोकऱ्या", ta: "கிடைக்கும் அரசு திட்டங்கள் மற்றும் வேலைகள்", gu: "ઉપલબ્ધ સરકારી યોજનાઓ અને નોકરીઓ",
+        kn: "ಲಭ್ಯವಿರುವ ಸರ್ಕಾರಿ ಯೋಜನೆಗಳು ಮತ್ತು ಉದ್ಯೋಗಗಳು", ml: "ലഭ്യമായ സർക്കാർ പദ്ധതികളും ജോലികളും", pa: "ਉਪਲਬਧ ਸਰਕਾਰੀ ਸਕੀਮਾਂ ਅਤੇ ਨੌਕਰੀਆਂ",
+        od: "ଉପଲବ୍ଧ ସରକାରୀ ଯୋଜନା ଏବଂ ଚାକିରି", en: "Available Schemes, Scholarships & Jobs"
+      },
+      hdr_sugg: {
+        hi: "व्यक्तिगत सुझाव (Feature K)", bn: "ব্যক্তিগত পরামর্শ (Feature K)", te: "వ్యక్తిగత సూచనలు (Feature K)", mr: "वैयक्तिक शिफारसी (Feature K)",
+        ta: "தனிப்பயனாக்கப்பட்ட பரிந்துரைகள் (Feature K)", gu: "વ્યક્તિગત સૂચનો (Feature K)", kn: "ವೈಯಕ್ತಿಕ ಶಿಫಾರಸುಗಳು (Feature K)",
+        ml: "വ്യക്തിഗത നിർദ്ദേശങ്ങൾ (Feature K)", pa: "ਨਿੱਜੀ ਸੁਝਾਅ (Feature K)", od: "ବ୍ୟକ୍ତିଗତ ପରାମର୍ଶ (Feature K)", en: "Personalized Suggestions (Feature K)"
+      },
+      hdr_fam: {
+        hi: "परिवार के सदस्य एवं प्रोफाइल", bn: "পরিবারের সদস্য ও প্রোফাইল", te: "కుటుంబ సభ్యులు మరియు ప్రొఫైల్", mr: "कुटुंबातील सदस्य व प्रोफाइल",
+        ta: "குடும்ப உறுப்பினர்கள் மற்றும் சுயவிவரம்", gu: "પરિવારના સભ્યો અને પ્રોફાઇલ", kn: "ಕುಟುಂಬದ ಸದಸ್ಯರು ಮತ್ತು ಪ್ರೊಫೈಲ್",
+        ml: "കുടുംബാംഗങ്ങളും പ്രൊഫൈലും", pa: "ਪਰਿਵਾਰਕ ਮੈਂਬਰ ਅਤੇ ਪ੍ਰੋਫਾਈਲ", od: "ପରିବାର ସଦସ୍ୟ ଏବଂ ପ୍ରୋଫାଇଲ୍", en: "Household Members & Profiles"
+      },
+      hdr_health: {
+        hi: "परिवार स्वास्थ्य व टीकाकरण", bn: "পারিবারিক স্বাস্থ্য ও টিকাকরণ", te: "కుటుంబ ఆరోగ్యం మరియు టీకాలు", mr: "कुटुंब आरोग्य व लसीकरण",
+        ta: "குடும்ப சுகாதாரம் மற்றும் தடுப்பூசி", gu: "પરિવાર સ્વાસ્થ્ય અને રસીકરણ", kn: "ಕುಟುಂಬ ಆರೋಗ್ಯ ಮತ್ತು ಲಸಿಕೆ",
+        ml: "കുടുംബ ആരോഗ്യവും കുത്തിവയ്പ്പും", pa: "ਪਰਿਵਾਰਕ ਸਿਹਤ ਅਤੇ ਟੀਕਾਕਰਨ", od: "ପରିବାର ସ୍ୱାସ୍ଥ୍ୟ ଏବଂ ଟିକାକରଣ", en: "Family Health & Immunization"
+      },
+      hdr_rem: {
+        hi: "समय यात्रा व स्मरण अलर्ट", bn: "সময় যাত্রা ও অনুস্মারক সতর্কতা", te: "సమయ ప్రయాణం మరియు రిమైండర్ హెచ్చరికలు", mr: "वेळ प्रवास व स्मरणपत्रे",
+        ta: "நேரப் பயணம் மற்றும் நினைவூட்டல் எச்சரிக்கைகள்", gu: "સમય યાત્રા અને રીમાઇન્ડર ચેતવણીઓ", kn: "ಸಮಯ ಪ್ರಯಾಣ ಮತ್ತು ಜ್ಞಾಪನೆ ಎಚ್ಚರಿಕೆಗಳು",
+        ml: "സമയ യാത്രയും റിമൈൻഡർ അലേർട്ടുകളും", pa: "ਸਮਾਂ ਯਾਤਰਾ ਅਤੇ ਯਾਦ-ਦਹਾਨੀ ਚਿਤਾਵਨੀਆਂ", od: "ସମୟ ଯାତ୍ରା ଏବଂ ସ୍ମାରକପତ୍ର ସତର୍କତା", en: "Time Travel & Reminders"
+      },
+      hdr_dash: {
+        hi: "ग्राम हब स्थिति व रेडियो पैकेट बहीखाता", bn: "গ্রাম হাব স্থিতি ও রেডিও প্যাকেট খতিয়ান", te: "గ్రామ హబ్ స్థితి మరియు రేడియో ప్యాకెట్ లెడ్జర్",
+        mr: "ग्राम हब स्थिती व रेडिओ पॅकेट खतावणी", ta: "கிராம மைய நிலை மற்றும் வானொலி பாக்கெட் லெட்ஜர்", gu: "ગ્રામ હબ સ્થિતિ અને રેડિયો પેકેટ ખાતાવહી",
+        kn: "ಗ್ರಾಮ ಹಬ್ ಸ್ಥಿತಿ ಮತ್ತು ರೇಡಿಯೋ ಪ್ಯಾಕೆಟ್ ಲೆಡ್ಜರ್", ml: "ഗ്രാമ ഹബ്ബ് അവസ്ഥയും റേഡിയോ പാക്കറ്റ് ലെഡ്ജറും", pa: "ਪਿੰਡ ਹੱਬ ਸਥਿਤੀ ਅਤੇ ਰੇਡੀਓ ਪੈਕੇਟ ਖਾਤਾ",
+        od: "ଗ୍ରାମ ହବ୍ ସ୍ଥିତି ଏବଂ ରେଡିଓ ପ୍ୟାକେଟ୍ ଲେଜର", en: "Village Hub Status & Radio Packet Ledger"
+      },
+      sugg_disclaimer: {
+        hi: "ℹ️ <strong>सुझाव, कोई गारंटी नहीं</strong>: यह सुझाव आपके कौशल और शिक्षा के आधार पर नियम अनुसार तैयार किए गए हैं।",
+        bn: "ℹ️ <strong>পরামর্শ, কোনো গ্যারান্টি নয়</strong>: আপনার দক্ষতা ও শিক্ষার ভিত্তিতে প্রস্তুত।",
+        te: "ℹ️ <strong>సూచన మాత్రమే, గ్యారెంటీ లేదు</strong>: మీ నైపుణ్యాలు మరియు విద్య ఆధారంగా రూపొందించబడింది.",
+        mr: "ℹ️ <strong>शिफारस, हमी नाही</strong>: आपल्या कौशल्य आणि शिक्षणावर आधारित.",
+        ta: "ℹ️ <strong>பரிந்துரை மட்டுமே, உத்தரவாதம் இல்லை</strong>: உங்கள் திறன் மற்றும் கல்வி அடிப்படையில்.",
+        gu: "ℹ️ <strong>માત્ર સૂચન, ગેરંટી નથી</strong>: તમારા કૌશલ્ય અને શિક્ષણ પર આધારિત.",
+        kn: "ℹ️ <strong>ಶಿಫಾರಸು ಮಾತ್ರ, ಖಾತರಿಯಿಲ್ಲ</strong>: ನಿಮ್ಮ ಕೌಶಲ್ಯ ಮತ್ತು ಶಿಕ್ಷಣದ ಆಧಾರದ ಮೇಲೆ.",
+        ml: "ℹ️ <strong>നിർദ്ദേശം മാത്രം, ഗ്യാരണ്ടിയില്ല</strong>: നിങ്ങളുടെ കഴിവുകളെ അടിസ്ഥാനമാക്കി.",
+        pa: "ℹ️ <strong>ਸਿਰਫ ਸੁਝਾਅ, ਗਾਰੰਟੀ ਨਹੀਂ</strong>: ਤੁਹਾਡੇ ਹੁਨਰ ਅਤੇ ਸਿੱਖਿਆ 'ਤੇ ਆਧਾਰਿਤ।",
+        od: "ℹ️ <strong>କେବଳ ପରାମର୍ଶ, କୌଣସି ଗ୍ୟାରେଣ୍ଟି ନାହିଁ</strong>: ଆପଣଙ୍କ ଦକ୍ଷତା ଓ ଶିକ୍ଷା ଉପରେ ଆଧାରିତ।",
+        en: "ℹ️ <strong>Suggested, not guaranteed</strong>: Generated strictly by deterministic matching rules."
+      },
+      health_disclaimer: {
+        hi: "⚠️ <strong>आवश्यक सूचना</strong>: यह केवल एक सामान्य अनुस्मारक और मार्गदर्शन है। यह चिकित्सीय सलाह या निदान का विकल्प नहीं है। किसी भी स्वास्थ्य समस्या के लिए अपनी ASHA कार्यकर्ता या प्राथमिक स्वास्थ्य केंद्र (PHC) से संपर्क करें।",
+        bn: "⚠️ <strong>প্রয়োজনীয় বিজ্ঞপ্তি</strong>: এটি কেবল একটি সাধারণ অনুস্মারক ও পরামর্শ। এটি চিকিৎসকের পরামর্শের বিকল্প নয়। ASHA কর্মী বা PHC-তে যোগাযোগ করুন।",
+        te: "⚠️ <strong>ముఖ్య గమనిక</strong>: ఇది సాధారణ రిమైండర్ మరియు మార్గదర్శకత్వం మాత్రమే. ఇది వైద్య సలహా లేదా నిర్ధారణకు ప్రత్యామ్నాయం కాదు. ASHA లేదా PHCని సంప్రదించండి.",
+        mr: "⚠️ <strong>महत्त्वाची सूचना</strong>: हे केवळ सामान्य स्मरणपत्र आणि मार्गदर्शन आहे. हा वैद्यकीय सल्ल्याचा पर्याय नाही. ASHA कार्यकर्ता किंवा PHC शी संपर्क साधा.",
+        ta: "⚠️ <strong>முக்கிய அறிவிப்பு</strong>: இது ஒரு பொதுவான நினைவூட்டல் மட்டுமே. இது மருத்துவ ஆலோசனை அல்ல. ASHA அல்லது PHC-ஐ தொடர்பு கொள்ளவும்.",
+        gu: "⚠️ <strong>મહત્વપૂર્ણ સૂચના</strong>: આ માત્ર સામાન્ય રીમાઇન્ડર અને માર્ગદર્શન છે. તે તબીબી સલાહનો વિકલ્પ નથી. ASHA કાર્યકર અથવા PHC નો સંપર્ક કરો.",
+        kn: "⚠️ <strong>ಮುಖ್ಯ ಸೂಚನೆ</strong>: ಇದು ಸಾಮಾನ್ಯ ಜ್ಞಾಪನೆ ಮಾತ್ರ. ಇದು ವೈದ್ಯಕೀಯ ಸಲಹೆಯ ಬದಲಿಯಲ್ಲ. ASHA ಅಥವಾ PHC ಅನ್ನು ಸಂಪರ್ಕಿಸಿ.",
+        ml: "⚠️ <strong>പ്രധാന അറിയിപ്പ്</strong>: ഇതൊരു പൊതുവായ ഓർമ്മപ്പെടുത്തൽ മാത്രമാണ്. ഇത് വൈദ്യോപദേശത്തിന് പകരമല്ല. ആശാ പ്രവർത്തകയുമായോ PHC യുമായോ ബന്ധപ്പെടുക.",
+        pa: "⚠️ <strong>ਜ਼ਰੂਰੀ ਸੂਚਨਾ</strong>: ਇਹ ਸਿਰਫ ਇੱਕ ਆਮ ਯਾਦ-ਦਹਾਨੀ ਹੈ। ਇਹ ਡਾਕਟਰੀ ਸਲਾਹ ਦਾ ਬਦਲ ਨਹੀਂ ਹੈ। ASHA ਵਰਕਰ ਜਾਂ PHC ਨਾਲ ਸੰਪਰਕ ਕਰੋ।",
+        od: "⚠️ <strong>ଗୁରୁତ୍ୱପୂର୍ଣ୍ଣ ସୂଚନା</strong>: ଏହା କେବଳ ଏକ ସାଧାରଣ ସ୍ମାରକପତ୍ର ଓ ମାର୍ଗଦର୍ଶନ। ଏହା ଡାକ୍ତରୀ ପରାମର୍ଶର ବିକଳ୍ପ ନୁହେଁ। ASHA କିମ୍ବା PHC ସହିତ ଯୋଗାଯୋଗ କରନ୍ତୁ।",
+        en: "⚠️ <strong>Notice</strong>: This is a general reminder and referral guide only. It does NOT replace medical advice or diagnosis. Consult your ASHA worker or PHC."
+      },
+      ff_title: {
+        hi: "⏩ समय यात्रा सिम्युलेटर (Fast-Forward)", bn: "⏩ সময় যাত্রা সিমুলেটর (Fast-Forward)", te: "⏩ సమయ ప్రయాణం సిమ్యులేటర్ (Fast-Forward)",
+        mr: "⏩ वेळ प्रवास सिम्युलेटर (Fast-Forward)", ta: "⏩ நேரப் பயண சிமுலேட்டர் (Fast-Forward)", gu: "⏩ સમય યાત્રા સિમ્યુલેટર (Fast-Forward)",
+        kn: "⏩ ಸಮಯ ಪ್ರಯಾಣ ಸಿಮ್ಯುಲೇಟರ್ (Fast-Forward)", ml: "⏩ സമയ യാത്ര സിമുലേറ്റർ (Fast-Forward)", pa: "⏩ ਸਮਾਂ ਯਾਤਰਾ ਸਿਮੂਲੇਟਰ (Fast-Forward)",
+        od: "⏩ ସମୟ ଯାତ୍ରା ସିମ୍ୟୁଲେଟର (Fast-Forward)", en: "⏩ Time Travel Simulator (Fast-Forward)"
+      },
+      ff_desc: {
+        hi: "भविष्य की अंतिम तिथियों और दस्तावेज़ तैयारी अलर्ट को तुरंत जांचने के लिए आगे बढ़ाएं:",
+        bn: "ভবিষ্যতের শেষ তারিখ ও নথি প্রস্তুতির সতর্কতা দেখতে সময় এগিয়ে নিন:",
+        te: "భవిష్యత్ గడువు తేదీలు మరియు పత్రాల తయారీ హెచ్చరికలను తనిఖీ చేయడానికి సమయాన్ని ముందుకు జరపండి:",
+        mr: "भविष्यातील अंतिम तारखा आणि कागदपत्रे पूर्वतयारी सूचना तपासण्यासाठी वेळ पुढे करा:",
+        ta: "எதிர்கால கடைசி தேதிகள் மற்றும் ஆவண தயாரிப்பு எச்சரிக்கைகளை சரிபார்க்க நேரத்தை முன்னெடுக்கவும்:",
+        gu: "ભવિષ્યની છેલ્લી તારીખો અને દસ્તાવેજ તૈયારી ચેતવણીઓ તપાસવા માટે સમય આગળ ધપાવો:",
+        kn: "ಭವಿಷ್ಯದ ಕೊನೆಯ ದಿನಾಂಕಗಳು ಮತ್ತು ದಾಖಲೆ ಸಿದ್ಧತೆ ಎಚ್ಚರಿಕೆಗಳನ್ನು ಪರೀಕ್ಷಿಸಲು ಸಮಯವನ್ನು ಮುನ್ನಡೆಸಿ:",
+        ml: "ഭാവിയിലെ അവസാന തീയതികളും രേഖാ തയ്യാറെടുപ്പ് അലേർട്ടുകളും പരിശോധിക്കാൻ സമയം മുന്നോട്ട് വയ്ക്കുക:",
+        pa: "ਭਵਿੱਖ ਦੀਆਂ ਆਖਰੀ ਮਿਤੀਆਂ ਅਤੇ ਦਸਤਾਵੇਜ਼ ਤਿਆਰੀ ਚਿਤਾਵਨੀਆਂ ਦੇਖਣ ਲਈ ਸਮਾਂ ਅੱਗੇ ਵਧਾਓ:",
+        od: "ଭବିଷ୍ୟତର ଶେଷ ତାରିଖ ଏବଂ ଦସ୍ତାବିଜ୍ ପ୍ରସ୍ତୁତି ସତର୍କତା ଦେଖିବା ପାଇଁ ସମୟ ଆଗକୁ ନିଅନ୍ତୁ:",
+        en: "Advance simulated time to test future deadlines and document lead-time alerts:"
       }
-      if (isRecording) {
-        recognition.stop();
-      } else {
-        recognition.lang = currentLang === 'hi' ? 'hi-IN' : 'en-IN';
-        recognition.start();
-      }
-    }
+    };
 
     async function init() {
       await loadHouseholds();
@@ -870,22 +967,38 @@ _HUB_PWA_HTML = """<!DOCTYPE html>
       await loadDashboard();
     }
 
-    function setLang(lang) {
+    function setGlobalLang(lang) {
       currentLang = lang;
-      document.getElementById('btn-hi').className = 'lang-btn ' + (lang === 'hi' ? 'active' : '');
-      document.getElementById('btn-en').className = 'lang-btn ' + (lang === 'en' ? 'active' : '');
       
-      // Update UI Labels
-      document.getElementById('lbl-sub').innerText = lang === 'hi' ? 'ग्रामीण जन सुविधा एवं अवसर केंद्र' : 'Rural Welfare & Opportunities Center';
-      document.getElementById('lbl-tier').innerText = lang === 'hi' ? 'TIER 1 — गाँव का स्थानीय हब (ऑफलाइन सक्षम)' : 'TIER 1 — Village Hub (Offline Capable)';
-      document.getElementById('tab-opps').innerText = lang === 'hi' ? 'योजनाएं एवं अवसर' : 'Opportunities';
-      document.getElementById('tab-sugg').innerText = lang === 'hi' ? 'आपके लिए सुझाव' : 'Suggested for You';
-      document.getElementById('tab-fam').innerText = lang === 'hi' ? 'मेरा परिवार' : 'My Family';
-      document.getElementById('tab-health').innerText = lang === 'hi' ? 'परिवार स्वास्थ्य' : 'Family Health';
-      document.getElementById('tab-rem').innerText = lang === 'hi' ? 'स्मरण व अलर्ट' : 'Reminders';
-      document.getElementById('tab-dash').innerText = lang === 'hi' ? 'ग्राम डैशबोर्ड' : 'Village Hub';
-      document.getElementById('btn-ask').innerText = lang === 'hi' ? 'पूछें' : 'Ask';
-      document.getElementById('voice-text').placeholder = lang === 'hi' ? 'बोलें या टाइप करें: क्या मेरा बेटा आवेदन कर सकता है?' : 'Ask: can my son apply?';
+      // Update UI Header & Tabs from I18N dictionary
+      document.getElementById('lbl-sub').innerText = I18N.sub_title[lang] || I18N.sub_title.en;
+      document.getElementById('lbl-tier').innerText = I18N.tier[lang] || I18N.tier.en;
+      document.getElementById('lbl-sync').innerText = I18N.sync_lbl[lang] || I18N.sync_lbl.en;
+      
+      document.getElementById('tab-opps').innerText = I18N.tab_opps[lang] || I18N.tab_opps.en;
+      document.getElementById('tab-opps-sub').innerText = I18N.tab_opps_sub[lang] || I18N.tab_opps_sub.en;
+      document.getElementById('tab-sugg').innerText = I18N.tab_sugg[lang] || I18N.tab_sugg.en;
+      document.getElementById('tab-sugg-sub').innerText = I18N.tab_sugg_sub[lang] || I18N.tab_sugg_sub.en;
+      document.getElementById('tab-fam').innerText = I18N.tab_fam[lang] || I18N.tab_fam.en;
+      document.getElementById('tab-fam-sub').innerText = I18N.tab_fam_sub[lang] || I18N.tab_fam_sub.en;
+      document.getElementById('tab-health').innerText = I18N.tab_health[lang] || I18N.tab_health.en;
+      document.getElementById('tab-health-sub').innerText = I18N.tab_health_sub[lang] || I18N.tab_health_sub.en;
+      document.getElementById('tab-rem').innerText = I18N.tab_rem[lang] || I18N.tab_rem.en;
+      document.getElementById('tab-rem-sub').innerText = I18N.tab_rem_sub[lang] || I18N.tab_rem_sub.en;
+      document.getElementById('tab-dash').innerText = I18N.tab_dash[lang] || I18N.tab_dash.en;
+      document.getElementById('tab-dash-sub').innerText = I18N.tab_dash_sub[lang] || I18N.tab_dash_sub.en;
+
+      document.getElementById('hdr-opps').innerText = I18N.hdr_opps[lang] || I18N.hdr_opps.en;
+      document.getElementById('hdr-sugg').innerText = I18N.hdr_sugg[lang] || I18N.hdr_sugg.en;
+      document.getElementById('hdr-fam').innerText = I18N.hdr_fam[lang] || I18N.hdr_fam.en;
+      document.getElementById('hdr-health').innerText = I18N.hdr_health[lang] || I18N.hdr_health.en;
+      document.getElementById('hdr-rem').innerText = I18N.hdr_rem[lang] || I18N.hdr_rem.en;
+      document.getElementById('hdr-dash').innerText = I18N.hdr_dash[lang] || I18N.hdr_dash.en;
+
+      document.getElementById('lbl-sugg-disclaimer').innerHTML = I18N.sugg_disclaimer[lang] || I18N.sugg_disclaimer.en;
+      document.getElementById('health-disclaimer').innerHTML = I18N.health_disclaimer[lang] || I18N.health_disclaimer.en;
+      document.getElementById('lbl-ff-title').innerText = I18N.ff_title[lang] || I18N.ff_title.en;
+      document.getElementById('lbl-ff-desc').innerText = I18N.ff_desc[lang] || I18N.ff_desc.en;
 
       renderOpportunities();
       const pSelSugg = document.getElementById('person-select-sugg');
@@ -903,7 +1016,7 @@ _HUB_PWA_HTML = """<!DOCTYPE html>
     }
 
     async function loadOpportunities() {
-      const res = await fetch('/api/opportunities');
+      const res = await fetch(`/api/opportunities?lang=${currentLang}`);
       const data = await res.json();
       allOpportunities = data.items;
       renderOpportunities();
@@ -912,12 +1025,12 @@ _HUB_PWA_HTML = """<!DOCTYPE html>
     function renderOpportunities() {
       const container = document.getElementById('opps-list');
       if (allOpportunities.length === 0) {
-        container.innerHTML = `<div class="card">${currentLang === 'hi' ? 'वर्तमान में कोई योजना उपलब्ध नहीं है।' : 'No opportunities available yet.'}</div>`;
+        container.innerHTML = `<div class="card">No opportunities available.</div>`;
         return;
       }
       container.innerHTML = allOpportunities.map(o => {
-        const title = currentLang === 'hi' && o.title_hi ? o.title_hi : o.title;
-        const lastDate = o.dates?.last_date || (currentLang === 'hi' ? 'शीघ्र' : 'Soon');
+        const title = o.title_localized || (currentLang === 'hi' && o.title_hi ? o.title_hi : o.title);
+        const lastDate = o.dates?.last_date || 'Soon';
         const docs = o.documents_required || [];
         return `
           <div class="card">
@@ -926,20 +1039,20 @@ _HUB_PWA_HTML = """<!DOCTYPE html>
                 <div class="card-title">${title}</div>
                 <div class="card-org">${o.org || ''} • <span style="text-transform: uppercase;">${o.type}</span></div>
               </div>
-              <span class="badge badge-eligible">सक्रिय ACTIVE</span>
+              <span class="badge badge-eligible">ACTIVE</span>
             </div>
             <div style="font-size: 13px; color: var(--text-muted); margin-bottom: 8px;">
-              🗓️ ${currentLang === 'hi' ? 'अंतिम तिथि' : 'Last Date'}: <strong>${lastDate}</strong> | 💰 ${currentLang === 'hi' ? 'शुल्क' : 'Fee'}: <strong>₹${o.fee || 0}</strong>
+              🗓️ Last Date: <strong>${lastDate}</strong> | 💰 Fee: <strong>₹${o.fee || 0}</strong>
             </div>
             ${docs.length > 0 ? `
               <div style="font-size: 12px; margin: 8px 0; background: rgba(0,0,0,0.2); padding: 8px 12px; border-radius: 8px;">
-                📑 <strong>${currentLang === 'hi' ? 'आवश्यक दस्तावेज़' : 'Documents'}:</strong>
-                ${docs.map(d => `${d.name_hi || d.name} (${d.typical_lead_time_days || 0} ${currentLang === 'hi' ? 'दिन' : 'days'})`).join(', ')}
+                📑 <strong>Documents:</strong>
+                ${docs.map(d => `${d.name_hi || d.name} (${d.typical_lead_time_days || 0} days)`).join(', ')}
               </div>` : ''}
             <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 12px;">
-              <a href="${o.source_url}" target="_blank" style="font-size: 12px; color: var(--primary); text-decoration: none;">🔗 ${currentLang === 'hi' ? 'आधिकारिक स्रोत' : 'Source'}</a>
+              <a href="${o.source_url}" target="_blank" style="font-size: 12px; color: var(--primary); text-decoration: none;">🔗 Official Source</a>
               <button onclick="checkFamilyEligibility('${o.id}')" style="background: rgba(59, 130, 246, 0.2); border: 1px solid var(--primary); color: #fff; padding: 6px 12px; border-radius: 12px; font-size: 12px; cursor: pointer;">
-                👨‍👩‍👧 ${currentLang === 'hi' ? 'परिवार की पात्रता जांचें' : 'Check Family Eligibility'}
+                👨‍👩‍👧 Check Family Eligibility
               </button>
             </div>
           </div>
@@ -964,7 +1077,7 @@ _HUB_PWA_HTML = """<!DOCTYPE html>
         famHtml += `
           <div class="card" style="border-left: 4px solid var(--primary);">
             <div style="font-weight: 800; font-size: 16px; margin-bottom: 4px;">🏡 ${hh.village}, ${hh.district}</div>
-            <div style="font-size: 12px; color: var(--text-muted); margin-bottom: 12px;">सदस्य संख्या: ${hh.member_count} | सहमति प्राप्त: ✓</div>
+            <div style="font-size: 12px; color: var(--text-muted); margin-bottom: 12px;">Members: ${hh.member_count} | Consent: ✓</div>
             <div style="display: flex; flex-direction: column; gap: 10px;">
               ${hh.members.map(m => {
                 const opt1 = document.createElement('option');
@@ -984,9 +1097,9 @@ _HUB_PWA_HTML = """<!DOCTYPE html>
                       <div style="font-size: 12px; color: var(--text-muted); margin-top: 2px;">
                         🎂 ${m.dob} | 🎓 ${m.education} | 🏷️ ${m.category}
                       </div>
-                      ${m.skills && m.skills.length > 0 ? `<div style="font-size: 11px; color: #60a5fa; margin-top: 4px;">🛠️ हुनर: ${m.skills.join(', ')}</div>` : ''}
+                      ${m.skills && m.skills.length > 0 ? `<div style="font-size: 11px; color: #60a5fa; margin-top: 4px;">🛠️ Skills: ${m.skills.join(', ')}</div>` : ''}
                     </div>
-                    <button onclick="viewPersonDetails('${m.id}')" style="background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15); color: #fff; padding: 6px 10px; border-radius: 10px; font-size: 11px; cursor: pointer;">सुझाव देखें</button>
+                    <button onclick="viewPersonDetails('${m.id}')" style="background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15); color: #fff; padding: 6px 10px; border-radius: 10px; font-size: 11px; cursor: pointer;">View Suggestions</button>
                   </div>
                 `;
               }).join('')}
@@ -995,7 +1108,7 @@ _HUB_PWA_HTML = """<!DOCTYPE html>
         `;
       });
 
-      famContainer.innerHTML = famHtml || 'कोई परिवार पंजीकृत नहीं है।';
+      famContainer.innerHTML = famHtml || 'No household registered.';
       if (pSelSugg.value) loadSuggestions(pSelSugg.value);
       if (pSelH.value) loadHealth(pSelH.value);
     }
@@ -1013,29 +1126,29 @@ _HUB_PWA_HTML = """<!DOCTYPE html>
       const data = await res.json();
       const matches = data.matches.filter(m => m.opportunity_id === oppId);
 
-      let msg = `${currentLang === 'hi' ? 'परिवार पात्रता परिणाम' : 'Family Eligibility Results'}:\n\n`;
+      let msg = `Family Eligibility Results:\n\n`;
       matches.forEach(m => {
-        msg += `• ${m.person_name}: ${m.status}\n  ${m.reasons.join(', ') || m.question || 'पूर्णतः पात्र'}\n\n`;
+        msg += `• ${m.person_name}: ${m.status}\n  ${m.reasons.join(', ') || m.question || 'Eligible'}\n\n`;
       });
       alert(msg);
     }
 
     async function loadSuggestions(personId) {
       if (!personId) return;
-      const res = await fetch(`/api/suggestions/${personId}`);
+      const res = await fetch(`/api/suggestions/${personId}?lang=${currentLang}`);
       const data = await res.json();
       const container = document.getElementById('suggestions-list');
 
       if (!data.suggestions || data.suggestions.length === 0) {
-        container.innerHTML = '<div class="card">कोई सुझाव उपलब्ध नहीं है।</div>';
+        container.innerHTML = '<div class="card">No suggestions found.</div>';
         return;
       }
 
       container.innerHTML = data.suggestions.map(s => {
-        const title = currentLang === 'hi' && s.title_hi ? s.title_hi : s.title;
-        const whyFit = currentLang === 'hi' ? s.why_fit_hi : s.why_fit;
+        const title = s.title_localized || (currentLang === 'hi' && s.title_hi ? s.title_hi : s.title);
+        const whyFit = s.why_fit_localized || (currentLang === 'hi' ? s.why_fit_hi : s.why_fit);
         const statusBadge = s.status === 'ELIGIBLE' ? 'badge-eligible' : (s.status === 'POSSIBLE' ? 'badge-possible' : 'badge-not');
-        const statusText = s.status === 'ELIGIBLE' ? (currentLang === 'hi' ? '✓ पात्र (ELIGIBLE)' : '✓ ELIGIBLE') : (s.status === 'POSSIBLE' ? (currentLang === 'hi' ? '? संभावित (POSSIBLE)' : '? POSSIBLE') : (currentLang === 'hi' ? '✗ अपात्र (NOT ELIGIBLE)' : '✗ NOT ELIGIBLE'));
+        const statusText = s.status === 'ELIGIBLE' ? '✓ ELIGIBLE' : (s.status === 'POSSIBLE' ? '? POSSIBLE' : '✗ NOT ELIGIBLE');
 
         return `
           <div class="card" style="border-left: 4px solid ${s.status === 'ELIGIBLE' ? '#10b981' : (s.status === 'POSSIBLE' ? '#f59e0b' : '#ef4444')};">
@@ -1048,20 +1161,20 @@ _HUB_PWA_HTML = """<!DOCTYPE html>
             </div>
 
             <div class="why-fit-box">
-              💡 <strong>${currentLang === 'hi' ? 'यह आपके लिए क्यों उपयुक्त है' : 'Why this fits you'}:</strong><br>
+              💡 <strong>Why this fits you:</strong><br>
               ${whyFit}
             </div>
 
             ${s.pathway_step ? `
               <div class="pathway-box">
-                🚀 <strong>${currentLang === 'hi' ? 'पात्र बनने के लिए कदम (Next Step)' : 'How to become eligible'}:</strong><br>
+                🚀 <strong>How to become eligible:</strong><br>
                 ${s.pathway_step.action_required}<br>
-                <a href="${s.pathway_step.source_url}" target="_blank" style="color: #fbbf24; text-decoration: none; font-weight: 600;">🔗 ${s.pathway_step.step_title} (${currentLang === 'hi' ? 'विवरण देखें' : 'View Details'})</a>
+                <a href="${s.pathway_step.source_url}" target="_blank" style="color: #fbbf24; text-decoration: none; font-weight: 600;">🔗 ${s.pathway_step.step_title} (View Details)</a>
               </div>` : ''}
 
             <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 10px; font-size: 11px; color: var(--text-muted);">
               <span>🎯 Fit Score: ${Math.round(s.fit_score * 100)}%</span>
-              <a href="${s.source_url}" target="_blank" style="color: var(--primary); text-decoration: none;">🔗 ${currentLang === 'hi' ? 'आधिकारिक सूचना' : 'Official Notice'}</a>
+              <a href="${s.source_url}" target="_blank" style="color: var(--primary); text-decoration: none;">🔗 Official Notice</a>
             </div>
           </div>
         `;
@@ -1080,14 +1193,14 @@ _HUB_PWA_HTML = """<!DOCTYPE html>
       container.innerHTML = `
         <div class="card">
           <div style="font-weight: 800; font-size: 16px; margin-bottom: 8px;">
-            👶 ${data.name} (आयु: ${data.age_years} वर्ष ${data.age_months % 12} माह)
+            👶 ${data.name} (Age: ${data.age_years} yrs ${data.age_months % 12} mos)
           </div>
           <div style="font-size: 13px; color: var(--text-muted); margin-bottom: 16px;">
-            स्रोत: ${data.source}
+            Source: ${data.source}
           </div>
 
           ${imms.length > 0 ? `
-            <div style="font-weight: 700; font-size: 14px; margin-bottom: 8px;">💉 राष्ट्रीय टीकाकरण सारणी (NIS):</div>
+            <div style="font-weight: 700; font-size: 14px; margin-bottom: 8px;">💉 Universal Immunization Schedule (NIS):</div>
             <div style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px;">
               ${imms.map(i => `
                 <div style="background: rgba(0,0,0,0.3); padding: 10px 14px; border-radius: 10px; display: flex; justify-content: space-between; align-items: center;">
@@ -1096,19 +1209,19 @@ _HUB_PWA_HTML = """<!DOCTYPE html>
                     <div style="font-size: 11px; color: var(--text-muted);">${i.notes || ''}</div>
                   </div>
                   <span class="badge ${i.status === 'due_now' ? 'badge-possible' : (i.status === 'upcoming' ? 'badge-eligible' : 'badge-not')}">
-                    ${i.status === 'due_now' ? 'अपेक्षित DUE' : (i.status === 'upcoming' ? 'आगामी' : 'समय पूर्ण')}
+                    ${i.status === 'due_now' ? 'DUE' : (i.status === 'upcoming' ? 'UPCOMING' : 'PASSED')}
                   </span>
                 </div>
               `).join('')}
             </div>` : ''}
 
-          <div style="font-weight: 700; font-size: 14px; margin-bottom: 8px; color: #fca5a5;">🚨 स्वास्थ्य खतरे के लक्षण व रेफरल दिशानिर्देश (NHM):</div>
+          <div style="font-weight: 700; font-size: 14px; margin-bottom: 8px; color: #fca5a5;">🚨 Danger Signs & Community Referral (NHM):</div>
           <div style="display: flex; flex-direction: column; gap: 8px;">
             ${redFlags.map(rf => `
               <div style="background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.2); padding: 10px 14px; border-radius: 10px;">
-                <div style="font-weight: 700; font-size: 13px; color: #fecaca;">⚠️ ${currentLang === 'hi' && rf.symptom_hi ? rf.symptom_hi : rf.symptom}</div>
-                <div style="font-size: 12px; color: #fff; margin-top: 4px;">🏥 <strong>कार्यवाही:</strong> ${currentLang === 'hi' && rf.action_hi ? rf.action_hi : rf.action}</div>
-                <div style="font-size: 10px; color: var(--text-muted); margin-top: 4px;">संदर्भ: ${rf.source_ref}</div>
+                <div style="font-weight: 700; font-size: 13px; color: #fecaca;">⚠️ ${rf.symptom}</div>
+                <div style="font-size: 12px; color: #fff; margin-top: 4px;">🏥 <strong>Action:</strong> ${rf.action}</div>
+                <div style="font-size: 10px; color: var(--text-muted); margin-top: 4px;">Reference: ${rf.source_ref}</div>
               </div>
             `).join('')}
           </div>
@@ -1118,7 +1231,7 @@ _HUB_PWA_HTML = """<!DOCTYPE html>
 
     async function setFastForward(days) {
       fastForwardDays = days;
-      document.getElementById('ff-val').innerText = `+${days} दिन`;
+      document.getElementById('ff-val').innerText = `+${days} days`;
       await loadReminders();
     }
 
@@ -1131,7 +1244,7 @@ _HUB_PWA_HTML = """<!DOCTYPE html>
     function renderReminders(data) {
       const container = document.getElementById('reminders-list');
       if (!data || !data.active_reminders || data.active_reminders.length === 0) {
-        container.innerHTML = `<div class="card" style="text-align: center; color: var(--text-muted);">${currentLang === 'hi' ? 'इस तिथि पर कोई स्मरण अलर्ट नहीं है।' : 'No reminders for this date.'}</div>`;
+        container.innerHTML = `<div class="card" style="text-align: center; color: var(--text-muted);">No reminders for this date.</div>`;
         return;
       }
       container.innerHTML = data.active_reminders.map(r => {
@@ -1145,7 +1258,7 @@ _HUB_PWA_HTML = """<!DOCTYPE html>
             </div>
             <div style="font-size: 13px; color: #fff; margin-bottom: 6px;">${msg}</div>
             <div style="font-size: 11px; color: var(--text-muted);">
-              योजना: <strong>${oppTitle}</strong> | नियत तिथि: <strong>${r.due_at}</strong>
+              Opportunity: <strong>${oppTitle}</strong> | Due Date: <strong>${r.due_at}</strong>
             </div>
           </div>
         `;
@@ -1158,15 +1271,15 @@ _HUB_PWA_HTML = """<!DOCTYPE html>
       const container = document.getElementById('dashboard-content');
       container.innerHTML = `
         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-bottom: 16px;">
-          <div class="card" style="padding: 14px;"><div style="font-size: 11px; color: var(--text-muted);">सक्रिय योजनाएं</div><div style="font-size: 24px; font-weight: 800;">${stats.active_opportunities}</div></div>
-          <div class="card" style="padding: 14px;"><div style="font-size: 11px; color: var(--text-muted);">पंजीकृत परिवार</div><div style="font-size: 24px; font-weight: 800;">${stats.registered_households}</div></div>
-          <div class="card" style="padding: 14px;"><div style="font-size: 11px; color: var(--text-muted);">गाँव के निवासी</div><div style="font-size: 24px; font-weight: 800;">${stats.village_residents}</div></div>
-          <div class="card" style="padding: 14px;"><div style="font-size: 11px; color: var(--text-muted);">सत्यापित रेडियो पैकेट</div><div style="font-size: 24px; font-weight: 800; color: #34d399;">${stats.verified_broadcast_packets}</div></div>
+          <div class="card" style="padding: 14px;"><div style="font-size: 11px; color: var(--text-muted);">Active Opportunities</div><div style="font-size: 24px; font-weight: 800;">${stats.active_opportunities}</div></div>
+          <div class="card" style="padding: 14px;"><div style="font-size: 11px; color: var(--text-muted);">Households</div><div style="font-size: 24px; font-weight: 800;">${stats.registered_households}</div></div>
+          <div class="card" style="padding: 14px;"><div style="font-size: 11px; color: var(--text-muted);">Residents</div><div style="font-size: 24px; font-weight: 800;">${stats.village_residents}</div></div>
+          <div class="card" style="padding: 14px;"><div style="font-size: 11px; color: var(--text-muted);">Verified Packets</div><div style="font-size: 24px; font-weight: 800; color: #34d399;">${stats.verified_broadcast_packets}</div></div>
         </div>
         <div class="card">
-          <div style="font-weight: 700; margin-bottom: 8px;">📡 रेडियो ब्रॉडकास्ट एवं सुरक्षा (Ed25519)</div>
+          <div style="font-weight: 700; margin-bottom: 8px;">📡 Sarvam AI & Ed25519 Security</div>
           <p style="font-size: 12px; color: var(--text-muted); line-height: 1.5;">
-            गाँव का हब ऑफलाइन रहते हुए केवल Ed25519 डिजिटल हस्ताक्षर द्वारा सत्यापित आधिकारिक पैकेट स्वीकार करता है। छेड़छाड़ किया गया कोई भी पैकेट स्वतः अस्वीकार हो जाता है।
+            The village hub operates offline and supports 9 Indian languages (Hindi, Bengali, Telugu, Marathi, Tamil, Gujarati, Kannada, Malayalam, Punjabi, Odia) and English via Sarvam AI.
           </p>
         </div>
       `;
@@ -1175,47 +1288,8 @@ _HUB_PWA_HTML = """<!DOCTYPE html>
     async function scanBroadcast() {
       const res = await fetch('/api/transport/scan', { method: 'POST' });
       const data = await res.json();
-      alert(`रेडियो सिंक पूर्ण। ${data.new_packets_ingested} नए पैकेट प्राप्त हुए।`);
+      alert(`Radio Sync complete. ${data.new_packets_ingested} new verified packets received.`);
       await init();
-    }
-
-    async function sendVoiceQuery() {
-      const input = document.getElementById('voice-text');
-      const query = input.value.trim();
-      if (!query) return;
-
-      const pSel = document.getElementById('person-select-sugg');
-      const personId = pSel ? pSel.value : null;
-
-      const res = await fetch('/api/voice/query', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          query: query,
-          person_id: personId,
-          lang: currentLang
-        })
-      });
-      const data = await res.json();
-      lastVoiceReplyText = currentLang === 'hi' ? data.reply_text_hi : data.reply_text_en;
-
-      document.getElementById('voice-modal-content').innerText = lastVoiceReplyText;
-      document.getElementById('voice-modal').style.display = 'flex';
-      playVoiceReply();
-      input.value = '';
-    }
-
-    function playVoiceReply() {
-      if ('speechSynthesis' in window && lastVoiceReplyText) {
-        const u = new SpeechSynthesisUtterance(lastVoiceReplyText);
-        u.lang = currentLang === 'hi' ? 'hi-IN' : 'en-IN';
-        window.speechSynthesis.speak(u);
-      }
-    }
-
-    function closeVoiceModal() {
-      document.getElementById('voice-modal').style.display = 'none';
-      if ('speechSynthesis' in window) window.speechSynthesis.cancel();
     }
 
     window.onload = init;

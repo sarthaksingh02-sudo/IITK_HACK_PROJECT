@@ -32,6 +32,7 @@ from cloud.db import CloudOpportunity, CloudPacket, RawNotice, get_db, init_db
 from cloud.extractor import extract_notice_spans
 from cloud.llm_client import MOCK_LLM, generate_audio_bulletin, translate_text
 from cloud.publisher import publish_opportunity_packet, publish_update_packet
+from shared.sarvam_client import SARVAM_LANGUAGES, translate_with_sarvam
 from shared.schemas import Opportunity, OpportunityType
 
 NOTICES_DIR = pathlib.Path(__file__).parent.parent / "data" / "real" / "notices"
@@ -422,17 +423,30 @@ def run_publish_chain(req: IngestTextRequest, db: Session = Depends(get_db)):
     }
 
 
-# ── Translation & Audio Bulletin ──────────────────────────────────────────────
+# ── Translation & Sarvam Languages ──────────────────────────────────────────
 
 class TranslateRequest(BaseModel):
     text: str
     target_lang: str = "hi"
+    source_lang: str = "en"
+
+
+@app.get("/api/languages")
+def get_languages():
+    """Returns the 9 Indian languages + English supported by Sarvam AI."""
+    return {"languages": SARVAM_LANGUAGES}
 
 
 @app.post("/api/translate")
 def api_translate(req: TranslateRequest):
-    result = translate_text(req.text, req.target_lang)
-    return {"original": req.text, "translated": result, "target_lang": req.target_lang}
+    """Translates text using Sarvam AI Indian language translation API with offline fallback."""
+    result = translate_with_sarvam(req.text, req.target_lang, req.source_lang)
+    return {
+        "original": req.text,
+        "translated": result,
+        "target_lang": req.target_lang,
+        "engine": "sarvam-ai",
+    }
 
 
 class TTSRequest(BaseModel):
@@ -699,6 +713,29 @@ _ADMIN_HTML = """<!DOCTYPE html>
       gap: 12px;
       margin-top: 8px;
     }
+    .lang-dropdown-container {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(30, 41, 59, 0.85);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 12px;
+      padding: 4px 10px;
+    }
+    .lang-select {
+      background: transparent;
+      border: none;
+      color: #fff;
+      font-weight: 600;
+      font-size: 13px;
+      cursor: pointer;
+      outline: none;
+      padding: 4px 6px;
+    }
+    .lang-select option {
+      background: #0f172a;
+      color: #fff;
+    }
   </style>
 </head>
 <body>
@@ -707,31 +744,48 @@ _ADMIN_HTML = """<!DOCTYPE html>
     <div class="logo">
       <div class="logo-badge">📡</div>
       <div>
-        <h1>AccessAI Cloud Control Center</h1>
-        <div style="font-size: 13px; color: var(--text-muted);">Tier 0 Broadcast & Packet Signing Station (AVINYA 2K26)</div>
+        <h1 id="lbl-cloud-title">AccessAI Cloud Control Center</h1>
+        <div style="font-size: 13px; color: var(--text-muted);" id="lbl-cloud-sub">Tier 0 Broadcast & Packet Signing Station (AVINYA 2K26)</div>
       </div>
     </div>
     <div style="display: flex; gap: 12px; align-items: center;">
-      <span class="status-badge"><span class="pulse-dot"></span> BROADCAST ACTIVE</span>
-      <button onclick="refreshData()" class="btn-secondary">🔄 Refresh</button>
+      <!-- Right-most Sarvam AI 9 Indian Languages + English Selector -->
+      <div class="lang-dropdown-container">
+        <span style="font-size: 16px;">🌐</span>
+        <select id="global-lang-select" class="lang-select" onchange="setGlobalLang(this.value)">
+          <option value="en" selected>🌐 English (EN)</option>
+          <option value="hi">🇮🇳 हिन्दी (Hindi)</option>
+          <option value="bn">🇮🇳 বাংলা (Bengali)</option>
+          <option value="te">🇮🇳 తెలుగు (Telugu)</option>
+          <option value="mr">🇮🇳 मराठी (Marathi)</option>
+          <option value="ta">🇮🇳 தமிழ் (Tamil)</option>
+          <option value="gu">🇮🇳 ગુજરાતી (Gujarati)</option>
+          <option value="kn">🇮🇳 ಕನ್ನಡ (Kannada)</option>
+          <option value="ml">🇮🇳 മലയാളം (Malayalam)</option>
+          <option value="pa">🇮🇳 ਪੰਜਾਬੀ (Punjabi)</option>
+          <option value="od">🇮🇳 ଓଡ଼ିଆ (Odia)</option>
+        </select>
+      </div>
+      <span class="status-badge"><span class="pulse-dot"></span> <span id="lbl-status-badge">BROADCAST ACTIVE</span></span>
+      <button onclick="refreshData()" class="btn-secondary" id="btn-refresh">🔄 Refresh</button>
     </div>
   </div>
 
   <div class="stats-grid">
     <div class="stat-card">
-      <div class="stat-lbl">Notices Ingested</div>
+      <div class="stat-lbl" id="lbl-stat-notices">Notices Ingested</div>
       <div class="stat-val" id="stat-notices">0</div>
     </div>
     <div class="stat-card">
-      <div class="stat-lbl">Drafts Pending Review</div>
+      <div class="stat-lbl" id="lbl-stat-drafts">Drafts Pending Review</div>
       <div class="stat-val" id="stat-drafts" style="color: #fbbf24;">0</div>
     </div>
     <div class="stat-card">
-      <div class="stat-lbl">Approved Opportunities</div>
+      <div class="stat-lbl" id="lbl-stat-approved">Approved Opportunities</div>
       <div class="stat-val" id="stat-approved" style="color: #60a5fa;">0</div>
     </div>
     <div class="stat-card">
-      <div class="stat-lbl">Signed Packets (Carousel)</div>
+      <div class="stat-lbl" id="lbl-stat-packets">Signed Packets (Carousel)</div>
       <div class="stat-val" id="stat-packets" style="color: #34d399;">0</div>
     </div>
   </div>
@@ -865,6 +919,145 @@ _ADMIN_HTML = """<!DOCTYPE html>
   <script>
     let currentOppId = null;
     let currentOppData = null;
+    let currentLang = 'en';
+
+    const CLOUD_I18N = {
+      app_title: {
+        hi: "AccessAI क्लाउड कंट्रोल सेंटर",
+        bn: "AccessAI ক্লাউড কন্ট্রোল সেন্টার",
+        te: "AccessAI క్లౌడ్ కంట్రోల్ సెంటర్",
+        mr: "AccessAI क्लाउड नियंत्रण केंद्र",
+        ta: "AccessAI கிளவுட் கட்டுப்பாட்டு மையம்",
+        gu: "AccessAI ક્લાઉડ કંટ્રોલ સેન્ટર",
+        kn: "AccessAI ಕ್ಲೌಡ್ ನಿಯಂತ್ರಣ ಕೇಂದ್ರ",
+        ml: "AccessAI ക്ലൗഡ് കൺട്രോൾ സെന്റർ",
+        pa: "AccessAI ਕਲਾਊਡ ਕੰਟਰੋਲ ਸੈਂਟਰ",
+        od: "AccessAI କ୍ଲାଉଡ଼ କଣ୍ଟ୍ରୋଲ ସେଣ୍ଟର",
+        en: "AccessAI Cloud Control Center"
+      },
+      cloud_sub: {
+        hi: "टीयर 0 ब्रॉडकास्ट एवं पैकेट हस्ताक्षर स्टेशन (AVINYA 2K26)",
+        bn: "টিয়ার ০ সম্প্রচার এবং প্যাকেট সাইনিং স্টেশন (AVINYA 2K26)",
+        te: "టైర్ 0 ప్రసారం మరియు ప్యాకెట్ సంతకం స్టేషన్ (AVINYA 2K26)",
+        mr: "टियर ० प्रसारण आणि पॅकेट स्वाक्षरी स्टेशन (AVINYA 2K26)",
+        ta: "அடுக்கு 0 ஒளிபரப்பு மற்றும் பாக்கெட் கையொப்ப நிலையம் (AVINYA 2K26)",
+        gu: "ટાયર 0 પ્રસારણ અને પેકેટ હસ્તાક્ષર સ્ટેશન (AVINYA 2K26)",
+        kn: "ಶ್ರೇಣಿ 0 ಪ್ರಸಾರ ಮತ್ತು ಪ್ಯಾಕೆಟ್ ಸಹಿ ಕೇಂದ್ರ (AVINYA 2K26)",
+        ml: "ടയർ 0 പ്രക്ഷേപണവും പാക്കറ്റ് ഒപ്പിടൽ സ്റ്റേഷനും (AVINYA 2K26)",
+        pa: "ਟੀਅਰ 0 ਪ੍ਰਸਾਰਣ ਅਤੇ ਪੈਕੇਟ ਦਸਤਖਤ ਸਟੇਸ਼ਨ (AVINYA 2K26)",
+        od: "ଟିୟର ୦ ପ୍ରସାରଣ ଏବଂ ପ୍ୟାକେଟ ସ୍ୱାକ୍ଷର ଷ୍ଟେସନ (AVINYA 2K26)",
+        en: "Tier 0 Broadcast & Packet Signing Station (AVINYA 2K26)"
+      },
+      status_active: {
+        hi: "ब्रॉडकास्ट सक्रिय",
+        bn: "সম্প্রচার সক্রিয়",
+        te: "ప్రసారం సక్రియం",
+        mr: "प्रसारण सक्रिय",
+        ta: "ஒளிபரப்பு செயலில் உள்ளது",
+        gu: "પ્રસારણ સક્રિય",
+        kn: "ಪ್ರಸಾರ ಸಕ್ರಿಯವಾಗಿದೆ",
+        ml: "പ്രക്ഷേപണം സജീവം",
+        pa: "ਪ੍ਰਸਾਰਣ ਚਾਲੂ ਹੈ",
+        od: "ପ୍ରସାରଣ ସକ୍ରିୟ",
+        en: "BROADCAST ACTIVE"
+      },
+      btn_refresh: {
+        hi: "🔄 ताज़ा करें",
+        bn: "🔄 রিফ্রেশ",
+        te: "🔄 రిఫ్రెష్",
+        mr: "🔄 रिफ्रेश",
+        ta: "🔄 புதுப்பி",
+        gu: "🔄 તાજું કરો",
+        kn: "🔄 ನವೀಕರಿಸಿ",
+        ml: "🔄 പുതുക്കുക",
+        pa: "🔄 ਰਿਫ੍ਰੈਸ਼",
+        od: "🔄 ରିଫ୍ରେଶ",
+        en: "🔄 Refresh"
+      },
+      stat_notices: {
+        hi: "प्राप्त सरकारी सूचनाएं",
+        bn: "প্রাপ্ত সরকারি বিজ্ঞপ্তি",
+        te: "స్వీకరించిన నోటీసులు",
+        mr: "प्राप्त शासकीय सूचना",
+        ta: "பெறப்பட்ட அறிவிப்புகள்",
+        gu: "મેળવેલ સૂચનાઓ",
+        kn: "ಸ್ವೀಕರಿಸಿದ ಪ್ರಕಟಣೆಗಳು",
+        ml: "ലഭിച്ച അറിയിപ്പുകൾ",
+        pa: "ਪ੍ਰਾਪਤ ਨੋਟਿਸ",
+        od: "ପ୍ରାପ୍ତ ବିଜ୍ଞପ୍ତି",
+        en: "Notices Ingested"
+      },
+      stat_drafts: {
+        hi: "समीक्षा हेतु लंबित ड्राफ्ट",
+        bn: "পর্যালোচনার অপেক্ষায় ড্রাফ্ট",
+        te: "పరిశీలనలో ఉన్న డ్రాఫ్ట్‌లు",
+        mr: "पुನरावलोकनासाठी प्रलंबित मसुदा",
+        ta: "மதிப்பாய்வு நிலுவையில் உள்ள வரைவுகள்",
+        gu: "સમીક્ષા માટે પેન્ડિંગ ડ્રાફ્ટ",
+        kn: "ಪರಿಶೀಲನೆಗೆ ಬಾಕಿ ಇರುವ ಕರಡುಗಳು",
+        ml: "പരിശോധനയിലുള്ള ഡ്രാഫ്റ്റുകൾ",
+        pa: "ਸਮੀਖਿਆ ਲਈ ਬਕਾਇਆ ਡਰਾਫਟ",
+        od: "ସମୀକ୍ଷା ପାଇଁ ବକେୟା ଡ୍ରାଫ୍ଟ",
+        en: "Drafts Pending Review"
+      },
+      stat_approved: {
+        hi: "स्वीकृत योजनाएं",
+        bn: "অনুমোদিত সুযোগসমূহ",
+        te: "ఆమోదించబడిన అవకాశాలు",
+        mr: "मंजूर झालेल्या योजना",
+        ta: "ஒப்புதல் அளிக்கப்பட்ட வாய்ப்புகள்",
+        gu: "મંજૂર થયેલી તકો",
+        kn: "ಅನುಮೋದಿತ ಅವಕಾಶಗಳು",
+        ml: "അംഗീകരിച്ച അവസരങ്ങൾ",
+        pa: "ਪ੍ਰਵਾਨਿਤ ਮੌਕੇ",
+        od: "ଅନୁମୋଦିତ ସୁଯୋଗ",
+        en: "Approved Opportunities"
+      },
+      stat_packets: {
+        hi: "हस्ताक्षरित पैकेट (रेडियो)",
+        bn: "স্বাক্ষরিত প্যাকেট (রেডিও)",
+        te: "సంతకం చేసిన ప్యాకెట్లు (రేడియో)",
+        mr: "स्वाक्षरित पॅकेट्स (रेडिओ)",
+        ta: "கையொப்பமிடப்பட்ட பாக்கெட்டுகள்",
+        gu: "સહી કરેલા પેકેટ્સ (રેડિયો)",
+        kn: "ಸಹಿ ಮಾಡಿದ ಪ್ಯಾಕೆಟ್‌ಗಳು",
+        ml: "ഒപ്പിട്ട പാക്കറ്റുകൾ (റേഡിയോ)",
+        pa: "ਦਸਤਖਤ ਕੀਤੇ ਪੈਕੇਟ (ਰੇਡੀਓ)",
+        od: "ସ୍ୱାକ୍ଷରିତ ପ୍ୟାକେଟ୍ (ରେଡିଓ)",
+        en: "Signed Packets (Carousel)"
+      }
+    };
+
+    function setGlobalLang(lang) {
+      currentLang = lang;
+      const dict = CLOUD_I18N;
+      
+      const titleEl = document.getElementById('lbl-cloud-title');
+      if (titleEl && dict.app_title[lang]) titleEl.innerText = dict.app_title[lang];
+
+      const subEl = document.getElementById('lbl-cloud-sub');
+      if (subEl && dict.cloud_sub[lang]) subEl.innerText = dict.cloud_sub[lang];
+
+      const statActEl = document.getElementById('lbl-status-badge');
+      if (statActEl && dict.status_active[lang]) statActEl.innerText = dict.status_active[lang];
+
+      const refEl = document.getElementById('btn-refresh');
+      if (refEl && dict.btn_refresh[lang]) refEl.innerText = dict.btn_refresh[lang];
+
+      const nEl = document.getElementById('lbl-stat-notices');
+      if (nEl && dict.stat_notices[lang]) nEl.innerText = dict.stat_notices[lang];
+
+      const dEl = document.getElementById('lbl-stat-drafts');
+      if (dEl && dict.stat_drafts[lang]) dEl.innerText = dict.stat_drafts[lang];
+
+      const aEl = document.getElementById('lbl-stat-approved');
+      if (aEl && dict.stat_approved[lang]) aEl.innerText = dict.stat_approved[lang];
+
+      const pEl = document.getElementById('lbl-stat-packets');
+      if (pEl && dict.stat_packets[lang]) pEl.innerText = dict.stat_packets[lang];
+
+      refreshData();
+    }
 
     async function init() {
       await loadFiles();
@@ -917,8 +1110,9 @@ _ADMIN_HTML = """<!DOCTYPE html>
         tr.style.cursor = 'pointer';
         tr.onclick = () => selectOpportunity(item.id);
         const badgeClass = item.status === 'published' ? 'badge-published' : (item.status === 'approved' ? 'badge-approved' : 'badge-draft');
+        const displayTitle = (currentLang === 'hi' && item.title_hi) ? item.title_hi : item.title;
         tr.innerHTML = `
-          <td style="font-weight: 600;">${item.title}</td>
+          <td style="font-weight: 600;">${displayTitle}</td>
           <td><span style="color: var(--text-muted); font-size: 12px;">${item.type}</span></td>
           <td><span class="badge ${badgeClass}">${item.status}</span></td>
           <td><button class="btn-secondary" style="padding: 4px 8px; font-size: 11px;" onclick="event.stopPropagation(); selectOpportunity('${item.id}')">Inspect</button></td>
