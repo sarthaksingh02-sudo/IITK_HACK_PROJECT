@@ -422,9 +422,18 @@ def get_reminders_route(
 
 # ── PWA Frontend UI ───────────────────────────────────────────────────────────
 
+from fastapi.staticfiles import StaticFiles
+
+REACT_DIST_DIR = pathlib.Path(__file__).parent.parent / "frontend" / "dist"
+if (REACT_DIST_DIR / "assets").exists():
+    app.mount("/assets", StaticFiles(directory=str(REACT_DIST_DIR / "assets")), name="assets")
+
+
 @app.get("/", response_class=HTMLResponse)
 def pwa_ui():
-    """Serves the rich PWA interface with Sarvam 9 Indian Languages + English dropdown."""
+    """Serves the rich React PWA interface with Sarvam 9 Indian Languages + English dropdown."""
+    if (REACT_DIST_DIR / "index.html").exists():
+        return HTMLResponse(content=(REACT_DIST_DIR / "index.html").read_text(encoding="utf-8"))
     return HTMLResponse(content=_HUB_PWA_HTML)
 
 
