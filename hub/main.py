@@ -957,6 +957,46 @@ _HUB_PWA_HTML = """<!DOCTYPE html>
         pa: "ਭਵਿੱਖ ਦੀਆਂ ਆਖਰੀ ਮਿਤੀਆਂ ਅਤੇ ਦਸਤਾਵੇਜ਼ ਤਿਆਰੀ ਚਿਤਾਵਨੀਆਂ ਦੇਖਣ ਲਈ ਸਮਾਂ ਅੱਗੇ ਵਧਾਓ:",
         od: "ଭବିଷ୍ୟତର ଶେଷ ତାରିଖ ଏବଂ ଦସ୍ତାବିଜ୍ ପ୍ରସ୍ତୁତି ସତର୍କତା ଦେଖିବା ପାଇଁ ସମୟ ଆଗକୁ ନିଅନ୍ତୁ:",
         en: "Advance simulated time to test future deadlines and document lead-time alerts:"
+      },
+      lbl_last_date: {
+        hi: "अंतिम तिथि", bn: "শেষ তারিখ", te: "గడువు తేదీ", mr: "अंतिम तारीख",
+        ta: "கடைசி தேதி", gu: "છેલ્લી તારીખ", kn: "ಕೊನೆಯ ದಿನಾಂಕ", ml: "അവസാന തീയതി",
+        pa: "ਆਖਰੀ ਮਿਤੀ", od: "ଶେଷ ତାରିଖ", en: "Last Date"
+      },
+      lbl_fee: {
+        hi: "शुल्क", bn: "ফি", te: "ఫీజు", mr: "शुल्क",
+        ta: "கட்டணம்", gu: "ફી", kn: "ಶುಲ್ಕ", ml: "ഫീസ്",
+        pa: "ਫੀਸ", od: "ଫିସ୍", en: "Fee"
+      },
+      lbl_docs: {
+        hi: "आवश्यक दस्तावेज़", bn: "প্রয়োজনীয় নথি", te: "అవసరమైన పత్రాలు", mr: "आवश्यक कागदपत्रे",
+        ta: "தேவையான ஆவணங்கள்", gu: "જરૂરી દસ્તાવેજો", kn: "ಅಗತ್ಯ ದಾಖಲೆಗಳು", ml: "ആവശ്യമായ രേഖകൾ",
+        pa: "ਲੋੜੀਂਦੇ ਦਸਤਾਵੇਜ਼", od: "ଆବଶ୍ୟକୀୟ ଦଲିଲ", en: "Documents Required"
+      },
+      lbl_source: {
+        hi: "🔗 आधिकारिक स्रोत", bn: "🔗 অফিসিয়াল সূত্র", te: "🔗 అధికారిక లింక్", mr: "🔗 अधिकृत स्रोत",
+        ta: "🔗 அதிகாரப்பூர்வ இணைப்பு", gu: "🔗 સત્તાવાર સ્ત્રોત", kn: "🔗 ಅಧಿಕೃತ ಮೂಲ", ml: "🔗 ഔദ്യോഗിക ലിങ്ക്",
+        pa: "🔗 ਅਧਿਕਾਰਤ ਸਰੋਤ", od: "🔗 ସରକାରୀ ଉତ୍ସ", en: "🔗 Official Source"
+      },
+      lbl_check_elig: {
+        hi: "👨‍👩‍👧 परिवार पात्रता जांचें", bn: "👨‍👩‍👧 পরিবারের যোগ্যতা দেখুন", te: "👨‍👩‍👧 కుటుంబ అర్హతను తనిఖీ చేయండి", mr: "👨‍👩‍👧 कुटुंब पात्रता तपासा",
+        ta: "👨‍👩‍👧 குடும்பத் தகுதியை சரிபார்க்கவும்", gu: "👨‍👩‍👧 પરિવારની પાત્રતા તપાસો", kn: "👨‍👩‍👧 ಕುಟುಂಬದ ಅರ್ಹತೆಯನ್ನು ಪರಿಶೀಲಿಸಿ", ml: "👨‍👩‍👧 കുടുംബ യോഗ്യത പരിശോധിക്കുക",
+        pa: "👨‍👩‍👧 ਪਰਿਵਾਰਕ ਯੋਗਤਾ ਜਾਂਚੋ", od: "👨‍👩‍👧 ପରିବାର ଯୋଗ୍ୟତା ଯାଞ୍ଚ କରନ୍ତୁ", en: "👨‍👩‍👧 Check Family Eligibility"
+      },
+      why_fit_hdr: {
+        hi: "💡 यह आपके लिए क्यों उपयुक्त है:", bn: "💡 এটি আপনার জন্য কেন উপযুক্ত:", te: "💡 ఇది మీకు ఎందుకు సరిపోతుంది:", mr: "💡 हे तुमच्यासाठी का योग्य आहे:",
+        ta: "💡 இது உங்களுக்கு ஏன் பொருத்தமானது:", gu: "💡 આ તમારા માટે શા માટે યોગ્ય છે:", kn: "💡 ಇದು ನಿಮಗೆ ಏಕೆ ಸೂಕ್ತವಾಗಿದೆ:", ml: "💡 ഇത് നിങ്ങൾക്ക് അനുയോജ്യമാകുന്നത് എന്തുകൊണ്ട്:",
+        pa: "💡 ਇਹ ਤੁਹਾਡੇ ਲਈ ਕਿਉਂ ਢੁਕਵਾਂ ਹੈ:", od: "💡 ଏହା ଆପଣଙ୍କ ପାଇଁ କାହିଁକି ଉପଯୁକ୍ତ:", en: "💡 Why this fits you:"
+      },
+      pathway_hdr: {
+        hi: "🚀 पात्र बनने के लिए अगला कदम:", bn: "🚀 যোগ্য হওয়ার জন্য পরবর্তী পদক্ষেপ:", te: "🚀 అర్హత సాధించడానికి తదుపరి దశ:", mr: "🚀 पात्र होण्यासाठी पुढील पाऊल:",
+        ta: "🚀 தகுதி பெறுவதற்கான அடுத்த படி:", gu: "🚀 પાત્ર બનવા માટેનું આગલું પગલું:", kn: "🚀 ಅರ್ಹತೆ ಪಡೆಯಲು ಮುಂದಿನ ಹಂತ:", ml: "🚀 അർഹത നേടാനുള്ള അടുത്ത ഘട്ടം:",
+        pa: "🚀 ਯੋਗ ਬਣਨ ਲਈ ਅਗਲਾ ਕਦਮ:", od: "🚀 ଯୋଗ୍ୟ ହେବା ପାଇଁ ପରବର୍ତ୍ତୀ ପଦକ୍ଷେପ:", en: "🚀 How to become eligible:"
+      },
+      fit_score_lbl: {
+        hi: "🎯 उपयुक्तता स्कोर", bn: "🎯 উপযুক্ততা স্কোর", te: "🎯 ఫిట్ స్కోరు", mr: "🎯 योग्यता गुण",
+        ta: "🎯 பொருத்தம் மதிப்பெண்", gu: "🎯 યોગ્યતા સ્કોર", kn: "🎯 ಸೂಕ್ತತೆಯ ಅಂಕ", ml: "🎯 ഫിറ്റ് സ്കോർ",
+        pa: "🎯 ਅਨੁਕੂਲਤਾ ਸਕੋਰ", od: "🎯 ଫିଟ୍ ସ୍କୋର", en: "🎯 Fit Score"
       }
     };
 
@@ -1000,12 +1040,12 @@ _HUB_PWA_HTML = """<!DOCTYPE html>
       document.getElementById('lbl-ff-title').innerText = I18N.ff_title[lang] || I18N.ff_title.en;
       document.getElementById('lbl-ff-desc').innerText = I18N.ff_desc[lang] || I18N.ff_desc.en;
 
-      renderOpportunities();
+      loadOpportunities();
       const pSelSugg = document.getElementById('person-select-sugg');
       if (pSelSugg && pSelSugg.value) loadSuggestions(pSelSugg.value);
       const pSelH = document.getElementById('person-select-health');
       if (pSelH && pSelH.value) loadHealth(pSelH.value);
-      renderReminders();
+      loadReminders();
     }
 
     function showSection(name, tabEl) {
@@ -1032,6 +1072,12 @@ _HUB_PWA_HTML = """<!DOCTYPE html>
         const title = o.title_localized || (currentLang === 'hi' && o.title_hi ? o.title_hi : o.title);
         const lastDate = o.dates?.last_date || 'Soon';
         const docs = o.documents_required || [];
+        const lblLast = I18N.lbl_last_date[currentLang] || 'Last Date';
+        const lblFee = I18N.lbl_fee[currentLang] || 'Fee';
+        const lblDocs = I18N.lbl_docs[currentLang] || 'Documents';
+        const lblSrc = I18N.lbl_source[currentLang] || '🔗 Official Source';
+        const lblCheck = I18N.lbl_check_elig[currentLang] || '👨‍👩‍👧 Check Family Eligibility';
+
         return `
           <div class="card">
             <div class="card-header">
@@ -1042,17 +1088,17 @@ _HUB_PWA_HTML = """<!DOCTYPE html>
               <span class="badge badge-eligible">ACTIVE</span>
             </div>
             <div style="font-size: 13px; color: var(--text-muted); margin-bottom: 8px;">
-              🗓️ Last Date: <strong>${lastDate}</strong> | 💰 Fee: <strong>₹${o.fee || 0}</strong>
+              🗓️ ${lblLast}: <strong>${lastDate}</strong> | 💰 ${lblFee}: <strong>₹${o.fee || 0}</strong>
             </div>
             ${docs.length > 0 ? `
               <div style="font-size: 12px; margin: 8px 0; background: rgba(0,0,0,0.2); padding: 8px 12px; border-radius: 8px;">
-                📑 <strong>Documents:</strong>
+                📑 <strong>${lblDocs}:</strong>
                 ${docs.map(d => `${d.name_hi || d.name} (${d.typical_lead_time_days || 0} days)`).join(', ')}
               </div>` : ''}
             <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 12px;">
-              <a href="${o.source_url}" target="_blank" style="font-size: 12px; color: var(--primary); text-decoration: none;">🔗 Official Source</a>
+              <a href="${o.source_url}" target="_blank" style="font-size: 12px; color: var(--primary); text-decoration: none;">${lblSrc}</a>
               <button onclick="checkFamilyEligibility('${o.id}')" style="background: rgba(59, 130, 246, 0.2); border: 1px solid var(--primary); color: #fff; padding: 6px 12px; border-radius: 12px; font-size: 12px; cursor: pointer;">
-                👨‍👩‍👧 Check Family Eligibility
+                ${lblCheck}
               </button>
             </div>
           </div>
@@ -1144,6 +1190,11 @@ _HUB_PWA_HTML = """<!DOCTYPE html>
         return;
       }
 
+      const whyHdr = I18N.why_fit_hdr[currentLang] || '💡 Why this fits you:';
+      const pathHdr = I18N.pathway_hdr[currentLang] || '🚀 How to become eligible:';
+      const fitLbl = I18N.fit_score_lbl[currentLang] || '🎯 Fit Score:';
+      const srcLbl = I18N.lbl_source[currentLang] || '🔗 Official Notice';
+
       container.innerHTML = data.suggestions.map(s => {
         const title = s.title_localized || (currentLang === 'hi' && s.title_hi ? s.title_hi : s.title);
         const whyFit = s.why_fit_localized || (currentLang === 'hi' ? s.why_fit_hi : s.why_fit);
@@ -1161,20 +1212,20 @@ _HUB_PWA_HTML = """<!DOCTYPE html>
             </div>
 
             <div class="why-fit-box">
-              💡 <strong>Why this fits you:</strong><br>
+              <strong>${whyHdr}</strong><br>
               ${whyFit}
             </div>
 
             ${s.pathway_step ? `
               <div class="pathway-box">
-                🚀 <strong>How to become eligible:</strong><br>
+                <strong>${pathHdr}</strong><br>
                 ${s.pathway_step.action_required}<br>
                 <a href="${s.pathway_step.source_url}" target="_blank" style="color: #fbbf24; text-decoration: none; font-weight: 600;">🔗 ${s.pathway_step.step_title} (View Details)</a>
               </div>` : ''}
 
             <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 10px; font-size: 11px; color: var(--text-muted);">
-              <span>🎯 Fit Score: ${Math.round(s.fit_score * 100)}%</span>
-              <a href="${s.source_url}" target="_blank" style="color: var(--primary); text-decoration: none;">🔗 Official Notice</a>
+              <span>${fitLbl} ${Math.round(s.fit_score * 100)}%</span>
+              <a href="${s.source_url}" target="_blank" style="color: var(--primary); text-decoration: none;">${srcLbl}</a>
             </div>
           </div>
         `;
