@@ -1,0 +1,40 @@
+# SOURCE: https://pmkisan.gov.in | RETRIEVED: 2026-10-09
+# Pradhan Mantri Kisan Samman Nidhi (PM-KISAN) Direct Benefit Transfer Scheme
+
+GOVERNMENT OF INDIA
+Ministry of Agriculture & Farmers Welfare
+Department of Agriculture and Farmers Welfare
+
+Operational Guidelines & Enrollment Notice: Pradhan Mantri Kisan Samman Nidhi (PM-KISAN)
+
+1. SCHEME OBJECTIVE:
+To augment the income of landholding farmer families across the country by providing direct financial support of Rs. 6,000 per annum, payable in three equal installments of Rs. 2,000 every four months directly into their bank accounts.
+
+2. ELIGIBILITY CRITERIA:
+- Target Beneficiary: Small, marginal, and all landholding farmer families having cultivable agricultural land registered in their name.
+- Age: Minimum 18 years, Maximum 75 years.
+- Landholding Requirement: Must possess cultivable agricultural landholding (Khatauni / Land Record) in state revenue records.
+- Gender / Category: Open to all genders (Male, Female) and all social categories (GEN, OBC, SC, ST).
+- Exclusions: Institutional landholders, serving/retired government officers, income tax payees of last assessment year, doctors/engineers/lawyers.
+
+3. IMPORTANT DATES:
+- Continuous Enrollment Scheme (Open 365 Days)
+- e-KYC and Farmer Registry Deadline for Upcoming Installment: 30 November 2026
+- Next Installment Disbursal Cycle: December 2026
+
+4. MANDATORY DOCUMENTS REQUIRED:
+- Land Record / Revenue Record (Khatauni / Khatiyan / Ror) [Typical issue time: 21 days from Tehsil/Lekhpal]
+- Aadhaar Card with active mobile number linked for OTP e-KYC
+- Active Bank Passbook linked to Aadhaar (NPCI Aadhaar Payment Bridge enabled)
+- Self-Declaration of non-exclusion criteria
+
+5. APPLICATION MODE & COST:
+- Mode: Online on https://pmkisan.gov.in or offline at nearest Common Service Centre (CSC) / Village Panchayat.
+- Portal Registration Fee: Rs. 0 (Free of cost). CSC processing fee: Nominal Rs. 15.
+
+6. APPLICATION PROCEDURE:
+Step 1: Visit https://pmkisan.gov.in and click on 'New Farmer Registration' under Farmers Corner.
+Step 2: Enter Aadhaar number, state, district, block, and village name.
+Step 3: Enter land details including Khata number, Khasra number, and land ownership area in hectares/acres.
+Step 4: Complete mandatory Aadhaar OTP e-KYC verification.
+Step 5: Submit application for Patwari/Lekhpal verification and block-level approval.

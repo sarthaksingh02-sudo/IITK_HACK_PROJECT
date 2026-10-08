@@ -1,0 +1,80 @@
+# TEST FIXTURE — Households and People
+# Label: TEST FIXTURE
+# Purpose: pytest only. Never shown in demo UI.
+# Names are obviously synthetic. No personally identifying information.
+
+_label: "TEST FIXTURE"
+
+households:
+
+  - id: "tf-hh-001"
+    village: "TestVillage"
+    district: "TestDistrict"
+    state: "TestState"
+
+people:
+
+  - id: "tf-p-adult-obc-m"
+    household_id: "tf-hh-001"
+    name: "[TEST] Adult OBC Male"
+    dob: "2000-01-01"       # 26 years old on 2026-01-01
+    gender: "M"
+    education: "secondary"
+    category: "OBC"
+    is_disabled: false
+    relation: "head"
+    skills: []
+    interests: []
+    languages: ["Hindi"]
+
+  - id: "tf-p-adult-obc-f"
+    household_id: "tf-hh-001"
+    name: "[TEST] Adult OBC Female"
+    dob: "1999-06-15"
+    gender: "F"
+    education: "graduate"
+    category: "OBC"
+    is_disabled: false
+    relation: "spouse"
+    skills: []
+    interests: []
+    languages: ["Hindi"]
+
+  - id: "tf-p-child"
+    household_id: "tf-hh-001"
+    name: "[TEST] Child"
+    dob: "2024-01-10"       # ~2 years old
+    gender: "F"
+    education: "none"
+    category: "OBC"
+    is_disabled: false
+    relation: "daughter"
+    skills: []
+    interests: []
+    languages: []
+
+  - id: "tf-p-unknown-fields"
+    household_id: "tf-hh-001"
+    name: "[TEST] Person with Unknown Fields"
+    dob: "2001-03-20"       # 25 years old on 2026-03-20
+    gender: null            # unknown
+    education: null         # unknown
+    category: null          # unknown
+    is_disabled: false
+    relation: "son"
+    skills: []
+    interests: []
+    languages: []
+
+  - id: "tf-p-disabled"
+    household_id: "tf-hh-001"
+    name: "[TEST] Disabled Person"
+    dob: "1990-08-01"
+    gender: "M"
+    education: "middle"
+    category: "SC"
+    is_disabled: true
+    relation: "other"
+    skills: []
+    interests: []
+    languages: []

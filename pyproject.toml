@@ -1,0 +1,36 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.backends.legacy:build"
+
+[project]
+name = "access-ai"
+version = "0.1.0"
+description = "Offline-first AI system for rural households – AVINYA 2K26"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi>=0.111",
+    "uvicorn[standard]>=0.29",
+    "pydantic>=2.7",
+    "sqlalchemy>=2.0",
+    "pynacl>=1.5",
+    "apscheduler>=3.10",
+    "python-dotenv>=1.0",
+    "httpx>=0.27",
+    "aiofiles>=23.2",
+    "jinja2>=3.1",
+    "python-multipart>=0.0.9",
+    "loguru>=0.7",
+    # Optional / heavy — installed manually per component
+    # faster-whisper, piper-tts, gtts, edge-tts, ollama
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8", "pytest-asyncio>=0.23", "httpx>=0.27"]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["shared*", "cloud*", "hub*"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["shared/tests", "hub/tests", "cloud/tests"]

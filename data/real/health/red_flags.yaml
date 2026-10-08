@@ -1,0 +1,81 @@
+# /data/real/health/red_flags.yaml
+#
+# SOURCE: Integrated Management of Neonatal and Childhood Illness (IMNCI) & Maternal Health Guidelines
+# URL: https://nhm.gov.in/images/pdf/programmes/child-health/guidelines/IMNCI-Module.pdf
+# URL: https://main.mohfw.gov.in
+# RETRIEVED: 2026-10-09
+# STATUS: VERIFIED — Official NHM/MoHFW clinical red flags for community referral
+#
+# ⚠ This module provides referral guidance ONLY, not medical diagnoses.
+# ⚠ The disclaimer MUST be shown alongside every red-flag check in the UI.
+
+_status: "VERIFIED"
+_source_url: "https://nhm.gov.in/images/pdf/programmes/child-health/guidelines/IMNCI-Module.pdf"
+_retrieved: "2026-10-09"
+
+disclaimer_en: "This is a general reminder and referral guide only. It does NOT replace medical advice or clinical diagnosis. Immediately contact your ASHA worker, ANM, or visit the nearest Primary Health Centre (PHC) / Community Health Centre (CHC) if any danger signs appear."
+disclaimer_hi: "यह केवल एक सामान्य अनुस्मारक और मार्गदर्शन है। यह चिकित्सीय सलाह या निदान का विकल्प नहीं है। कोई भी खतरे का लक्षण दिखने पर तुरंत अपनी ASHA कार्यकर्ता, ANM से संपर्क करें या निकटतम प्राथमिक/सामुदायिक स्वास्थ्य केंद्र (PHC/CHC) जाएं।"
+
+red_flags:
+  - id: "rf-child-001"
+    symptom: "Child unable to drink or breastfeed, or vomiting everything"
+    symptom_hi: "बच्चा स्तनपान करने या पीने में असमर्थ है, या सब कुछ उल्टी कर रहा है"
+    action: "IMMEDIATE EMERGENCY REFERRAL to nearest CHC/District Hospital. Keep child warm during transit."
+    action_hi: "तुरंत निकटतम CHC या जिला अस्पताल ले जाएं। रास्ते में बच्चे को गर्म रखें।"
+    category: "child"
+    severity: "emergency"
+    source_ref: "IMNCI Module 1 - General Danger Signs, p. 14"
+
+  - id: "rf-child-002"
+    symptom: "Convulsions (fits/seizures) or child abnormally sleepy / unconscious"
+    symptom_hi: "बच्चे को दौरे (झटके) आ रहे हैं या वह असामान्य रूप से सुस्त/बेहोश है"
+    action: "EMERGENCY: Rush to PHC/Hospital immediately. Do not put anything in child's mouth."
+    action_hi: "आपातकालीन: तुरंत अस्पताल जाएं। बच्चे के मुंह में कुछ भी न डालें।"
+    category: "child"
+    severity: "emergency"
+    source_ref: "IMNCI Module 1 - General Danger Signs, p. 16"
+
+  - id: "rf-child-003"
+    symptom: "Fast breathing (>50 breaths/min for 2-11 mos, >40 breaths/min for 1-5 yrs) or chest indrawing"
+    symptom_hi: "तेज सांस चलना या सांस लेते समय छाती का अंदर धंसना (पसली चलना)"
+    action: "Refer urgently to Medical Officer for suspected pneumonia / severe respiratory infection."
+    action_hi: "संभावित निमोनिया - तुरंत डॉक्टर या PHC को दिखाएं।"
+    category: "child"
+    severity: "urgent"
+    source_ref: "IMNCI Module 2 - Acute Respiratory Infection, p. 22"
+
+  - id: "rf-child-004"
+    symptom: "High fever lasting more than 3 days, or fever with stiff neck / skin rash"
+    symptom_hi: "3 दिन से अधिक तेज बुखार, या गर्दन में अकड़न / शरीर पर चकत्ते"
+    action: "Visit Primary Health Centre for blood examination (malaria/dengue/meningitis evaluation)."
+    action_hi: "रक्त जांच हेतु प्राथमिक स्वास्थ्य केंद्र (PHC) जाएं।"
+    category: "child"
+    severity: "urgent"
+    source_ref: "IMNCI Module 4 - Fever Assessment, p. 38"
+
+  - id: "rf-maternal-001"
+    symptom: "Severe vaginal bleeding during pregnancy or postpartum"
+    symptom_hi: "गर्भावस्था के दौरान या प्रसव के बाद अधिक रक्तस्राव"
+    action: "CRITICAL EMERGENCY: Call 108/102 Ambulance immediately and shift to FRU/District Hospital."
+    action_hi: "अति गंभीर: तुरंत 108/102 एम्बुलेंस बुलाएं और जिला अस्पताल/FRU जाएं।"
+    category: "maternal"
+    severity: "emergency"
+    source_ref: "MoHFW Maternal Danger Signs Protocol, Sec 3.1"
+
+  - id: "rf-maternal-002"
+    symptom: "Severe headache with blurred vision, severe epigastric pain, or swelling of face and hands"
+    symptom_hi: "तेज सिरदर्द, धुंधला दिखाई देना, या चेहरे व हाथों में अत्यधिक सूजन (प्री-एक्लेम्पसिया लक्षण)"
+    action: "Urgently check blood pressure at PHC/Sub-centre for suspected pre-eclampsia."
+    action_hi: "रक्तचाप (BP) की जांच हेतु तुरंत उपकेंद्र या PHC जाएं।"
+    category: "maternal"
+    severity: "urgent"
+    source_ref: "MoHFW Maternal Danger Signs Protocol, Sec 3.4"
+
+  - id: "rf-maternal-003"
+    symptom: "Reduced or absent fetal movements in the third trimester"
+    symptom_hi: "गर्भावस्था के अंतिम महीनों में बच्चे की हलचल कम होना या बंद होना"
+    action: "Consult doctor / ANM immediately for fetal heartbeat check."
+    action_hi: "तुरंत ANM या डॉक्टर से जांच करवाएं।"
+    category: "maternal"
+    severity: "urgent"
+    source_ref: "MoHFW Antenatal Care Guidelines, Sec 4.2"

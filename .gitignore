@@ -1,0 +1,28 @@
+# Keys — never commit private.key
+keys/private.key
+keys/private.key.bak
+
+# Databases
+*.db
+*.db-shm
+*.db-wal
+
+# Env
+.env
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+.venv/
+venv/
+env/
+
+# Node / Vite
+hub/ui/node_modules/
+hub/ui/dist/
+
+# OS
+.DS_Store
+Thumbs.db

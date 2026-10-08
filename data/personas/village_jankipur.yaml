@@ -1,0 +1,104 @@
+# TEST PERSONA — Jankipur Village Household
+# Label: TEST PERSONA
+# Purpose: Demo and development only. These are fictional people invented for testing.
+#          NEVER present these as real individuals. NEVER use in unit tests (use /tests/fixtures/).
+# Created: 2026-10-09
+
+household:
+  id: "hh-jankipur-001"
+  village: "Jankipur"
+  district: "Varanasi"
+  state: "Uttar Pradesh"
+  _label: "TEST PERSONA"
+
+people:
+
+  - id: "p-arjun-001"
+    household_id: "hh-jankipur-001"
+    name: "Arjun Kumar"
+    name_hi: "अर्जुन कुमार"
+    dob: "2007-03-14"          # Age 19 as of Oct 2026; computed at runtime
+    gender: "M"
+    relation: "son"
+    education: "secondary"     # Passed Class 10
+    category: "OBC"
+    is_disabled: false
+    occupation: null
+    skills:
+      - "basic computer"
+      - "mobile repair (self-taught)"
+    interests:
+      - "electronics"
+      - "government jobs"
+    languages:
+      - "Hindi"
+    land_acres: null
+    assets: []
+    _label: "TEST PERSONA"
+
+  - id: "p-savitri-001"
+    household_id: "hh-jankipur-001"
+    name: "Savitri Devi"
+    name_hi: "सावित्री देवी"
+    dob: "1980-07-22"          # Age 46 as of Oct 2026
+    gender: "F"
+    relation: "head"
+    education: "primary"
+    category: "OBC"
+    is_disabled: false
+    occupation: "farmer"
+    skills:
+      - "farming"
+      - "stitching"
+    interests:
+      - "agricultural schemes"
+      - "skill training"
+    languages:
+      - "Hindi"
+    land_acres: 1.5
+    assets:
+      - "1 acre rain-fed land"
+      - "1 goat"
+    _label: "TEST PERSONA"
+
+  - id: "p-priya-001"
+    household_id: "hh-jankipur-001"
+    name: "Priya Kumari"
+    name_hi: "प्रिया कुमारी"
+    dob: "2024-01-10"          # Age ~2 years; immunization schedule applies
+    gender: "F"
+    relation: "daughter"
+    education: "none"
+    category: "OBC"
+    is_disabled: false
+    occupation: null
+    skills: []
+    interests: []
+    languages: []
+    land_acres: null
+    assets: []
+    _label: "TEST PERSONA"
+
+  - id: "p-ramesh-001"
+    household_id: "hh-jankipur-001"
+    name: "Ramesh Kumar"
+    name_hi: "रमेश कुमार"
+    dob: "1978-11-05"          # Age 47
+    gender: "M"
+    relation: "head"           # Second household head — Savitri's husband
+    education: "middle"
+    category: "OBC"
+    is_disabled: false
+    occupation: "daily wage labour"
+    skills:
+      - "masonry"
+      - "carpentry"
+    interests:
+      - "skill certification"
+      - "PMKVY"
+    languages:
+      - "Hindi"
+    land_acres: 1.5
+    assets:
+      - "1 acre rain-fed land"
+    _label: "TEST PERSONA"

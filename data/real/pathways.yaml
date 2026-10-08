@@ -1,0 +1,159 @@
+# /data/real/pathways.yaml
+#
+# Career, skill, and education progression pathways:
+# education_level → next steps, skill trainings, exams, and qualifications.
+#
+# SOURCES:
+#   - National Career Service Portal: https://www.ncs.gov.in
+#   - Skill India Digital / PMKVY: https://www.skillindiadigital.gov.in
+#   - Staff Selection Commission: https://ssc.gov.in
+#   - National Institute of Open Schooling (NIOS): https://www.nios.ac.in
+# RETRIEVED: 2026-10-09
+# STATUS: VERIFIED
+
+_status: "VERIFIED"
+_source_url: "https://www.ncs.gov.in"
+_retrieved: "2026-10-09"
+
+pathways:
+  none:
+    - id: "path-none-001"
+      title: "NIOS Open Basic Education (OBE) Level A/B (Primary Equivalency)"
+      title_hi: "एनआईओएस ओपन बेसिक शिक्षा (प्राथमिक स्तर)"
+      type: "next_step"
+      description: "Basic literacy, numeracy, and life-skills certification through National Institute of Open Schooling."
+      eligibility_note: "Open to all age groups with no prior formal schooling required."
+      source_url: "https://www.nios.ac.in/open-basic-education-programme.aspx"
+      retrieved_date: "2026-10-09"
+
+    - id: "path-none-002"
+      title: "PMKVY Recognition of Prior Learning (RPL) - Construction / Agriculture"
+      title_hi: "पीएमकेवीवाई पूर्व ज्ञान प्रमाणन (आरपीएल)"
+      type: "training"
+      description: "Government skill certificate certifying hands-on experience for daily wage masons, agricultural laborers, and artisans."
+      eligibility_note: "Requires minimum 1-2 years informal work experience."
+      source_url: "https://www.skillindiadigital.gov.in"
+      retrieved_date: "2026-10-09"
+
+  primary:
+    - id: "path-pri-001"
+      title: "NIOS OBE Level C (Class 8 / Middle School Equivalency)"
+      title_hi: "एनआईओएस मिडिल स्कूल (कक्षा 8) समकक्षता"
+      type: "next_step"
+      description: "Self-paced study leading to recognized Class 8 pass certificate, unlocking technical vocational courses."
+      eligibility_note: "Requires basic reading/writing or Class 5 pass."
+      source_url: "https://www.nios.ac.in/open-basic-education-programme.aspx"
+      retrieved_date: "2026-10-09"
+
+    - id: "path-pri-002"
+      title: "PMKVY Assistant Mason / Organic Farmer Short-Term Training"
+      title_hi: "पीएमकेवीवाई सहायक राजमिस्त्री / जैविक कृषि प्रशिक्षण"
+      type: "training"
+      description: "200-hour NSQF Level 2 government-funded vocational training with stipend and job placement support."
+      eligibility_note: "Primary pass (Class 5), age 18-45."
+      source_url: "https://www.skillindiadigital.gov.in"
+      retrieved_date: "2026-10-09"
+
+  middle:
+    - id: "path-mid-001"
+      title: "Secondary School (Class 10 Matriculation) Admission via State Board / NIOS"
+      title_hi: "माध्यमिक (कक्षा 10वीं) प्रवेश - स्टेट बोर्ड या एनआईओएस"
+      type: "next_step"
+      description: "Enrol in Class 9-10 to earn a Secondary School Certificate (SSC/Matric), prerequisite for major government recruitments."
+      eligibility_note: "Class 8 pass certificate required."
+      source_url: "https://upmsp.edu.in"
+      retrieved_date: "2026-10-09"
+
+    - id: "path-mid-002"
+      title: "Industrial Training Institute (ITI) Trades (Welder, Plumber, Mason)"
+      title_hi: "आईटीआई ट्रेड (वेल्डर, प्लंबर, मैसन)"
+      type: "qualification"
+      description: "1-year or 2-year National Trade Certificate (NTC) courses approved by NCVT."
+      eligibility_note: "Passed Class 8, age 14+."
+      source_url: "https://dgt.gov.in/craftsmen-training-scheme"
+      retrieved_date: "2026-10-09"
+
+  secondary:
+    - id: "path-sec-001"
+      title: "Senior Secondary (10+2 / Intermediate) Admission in Arts/Science/Commerce"
+      title_hi: "उच्चतर माध्यमिक (10+2 / इंटरमीडिएट) प्रवेश"
+      type: "next_step"
+      description: "Complete 10+2 Intermediate education to qualify for college degrees, technical diplomas, and national examinations."
+      eligibility_note: "Class 10 (Secondary) pass with minimum passing marks."
+      source_url: "https://upmsp.edu.in"
+      retrieved_date: "2026-10-09"
+
+    - id: "path-sec-002"
+      title: "SSC GD Constable & Central Armed Police Forces (CAPF) Recruitment"
+      title_hi: "एसएससी जीडी कांस्टेबल व अर्धसैनिक बल भर्ती"
+      type: "exam"
+      description: "Direct entry exam for Constable (General Duty) in BSF, CISF, CRPF, SSB, ITBP, AR, and SSF."
+      eligibility_note: "Class 10 pass, Age 18-23 years (age relaxations apply for OBC/SC/ST)."
+      source_url: "https://ssc.gov.in"
+      retrieved_date: "2026-10-09"
+
+    - id: "path-sec-003"
+      title: "ITI Electrician / Fitter / Mobile Repair Technician Diploma"
+      title_hi: "आईटीआई इलेक्ट्रीशियन / फिटर / मोबाइल रिपेयर डिप्लोमा"
+      type: "qualification"
+      description: "2-year technical certification program with industry apprenticeships and railway/defense eligibility."
+      eligibility_note: "Class 10 pass with Science & Math."
+      source_url: "https://dgt.gov.in"
+      retrieved_date: "2026-10-09"
+
+  senior_sec:
+    - id: "path-sen-001"
+      title: "Bachelor's Degree (BA / BSc / BCom / BCA / B.Tech) Admission"
+      title_hi: "स्नातक डिग्री (बीए / बीएससी / बीकॉम / बीसीए) में प्रवेश"
+      type: "next_step"
+      description: "Undergraduate degree programs opening doors to civil services, banking, teaching, and corporate sectors."
+      eligibility_note: "10+2 pass certificate."
+      source_url: "https://www.ugc.gov.in"
+      retrieved_date: "2026-10-09"
+
+    - id: "path-sen-002"
+      title: "SSC Combined Higher Secondary Level (CHSL) Exam (LDC/JSA/DEO)"
+      title_hi: "एसएससी सीएचएसएल (10+2) परीक्षा - एलडीसी / क्लर्क"
+      type: "exam"
+      description: "Recruitment for Lower Division Clerk, Junior Secretariat Assistant, and Data Entry Operators across Central Ministries."
+      eligibility_note: "10+2 Intermediate pass, Age 18-27."
+      source_url: "https://ssc.gov.in"
+      retrieved_date: "2026-10-09"
+
+    - id: "path-sen-003"
+      title: "Polytechnic Engineering 3-Year Diploma (Mechanical/Electrical/Civil/CS)"
+      title_hi: "पॉलिटेक्निक इंजीनियरिंग 3-वर्षीय डिप्लोमा"
+      type: "qualification"
+      description: "State Board of Technical Education diploma leading to Junior Engineer (JE) opportunities."
+      eligibility_note: "10+2 / 10th with Science & Math."
+      source_url: "https://bteup.ac.in"
+      retrieved_date: "2026-10-09"
+
+  graduate:
+    - id: "path-grad-001"
+      title: "SSC Combined Graduate Level (CGL) Examination"
+      title_hi: "एसएससी सीजीएल स्नातक स्तरीय परीक्षा"
+      type: "exam"
+      description: "Group B and C Gazetted/Non-Gazetted posts in Central Government ministries (Income Tax, Excise, CBI, Audit)."
+      eligibility_note: "Bachelor's Degree from recognized university, Age 18-32."
+      source_url: "https://ssc.gov.in"
+      retrieved_date: "2026-10-09"
+
+    - id: "path-grad-002"
+      title: "State Public Service Commission (e.g. UPPSC Combined State / Upper Subordinate)"
+      title_hi: "राज्य लोक सेवा आयोग (यूपीपीएससी सम्मिलित राज्य सेवा)"
+      type: "exam"
+      description: "Recruitment for SDM, DSP, BDO, Tehsildar, and district administrative cadres."
+      eligibility_note: "Graduation degree, Age 21-40 (relaxations apply)."
+      source_url: "https://uppsc.up.nic.in"
+      retrieved_date: "2026-10-09"
+
+  postgrad:
+    - id: "path-post-001"
+      title: "UGC NET / JRF (Assistant Professor & Junior Research Fellowship)"
+      title_hi: "यूजीसी नेट / जेआरएफ (सहायक प्रोफेसर एवं रिसर्च फैलोशिप)"
+      type: "exam"
+      description: "National level exam to determine eligibility for Assistant Professorship and PhD fellowships in Indian universities."
+      eligibility_note: "Master's Degree with minimum 55% marks (50% for OBC/SC/ST)."
+      source_url: "https://ugcnet.nta.ac.in"
+      retrieved_date: "2026-10-09"

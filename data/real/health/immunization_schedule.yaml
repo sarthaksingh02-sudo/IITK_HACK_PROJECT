@@ -1,0 +1,89 @@
+# /data/real/health/immunization_schedule.yaml
+#
+# SOURCE: National Immunization Schedule (NIS), Ministry of Health and Family Welfare, Government of India
+# URL: https://main.mohfw.gov.in/sites/default/files/NIS%20calendar_English_0.pdf
+# RETRIEVED: 2026-10-09
+# STATUS: VERIFIED — Official Universal Immunization Programme (UIP) schedule
+#
+# Every field matches official MoHFW guidelines for infants and children.
+# ⚠ Disclaimer must always be shown alongside health information.
+
+_status: "VERIFIED"
+_source_url: "https://main.mohfw.gov.in/sites/default/files/NIS%20calendar_English_0.pdf"
+_retrieved: "2026-10-09"
+
+disclaimer_en: "This is a general reminder only. It does NOT replace medical advice. Consult your ASHA worker, ANM, or nearest Primary Health Centre (PHC) for immunization."
+disclaimer_hi: "यह केवल एक सामान्य अनुस्मारक है। यह चिकित्सा सलाह का विकल्प नहीं है। टीकाकरण के लिए अपनी ASHA कार्यकर्ता, ANM या निकटतम प्राथमिक स्वास्थ्य केंद्र (PHC) से संपर्क करें।"
+
+schedule:
+  - vaccine: "BCG, OPV-0, Hepatitis B birth dose"
+    vaccine_hi: "बीसीजी, ओपीवी-0, हेपेटाइटिस बी (जन्म खुराक)"
+    when: "At birth"
+    when_hi: "जन्म के समय"
+    months_from_birth: 0.0
+    dose: "Single dose"
+    route: "Intradermal / Oral / Intramuscular"
+    notes: "BCG can be given up to 1 year of age if missed at birth."
+
+  - vaccine: "OPV-1, Pentavalent-1, Rotavirus-1, fIPV-1, PCV-1"
+    vaccine_hi: "ओपीवी-1, पेंटावेलेंट-1, रोटावायरस-1, एफआईपीवी-1, पीसीवी-1"
+    when: "6 weeks"
+    when_hi: "6 सप्ताह (1.5 माह)"
+    months_from_birth: 1.5
+    dose: "1st dose"
+    route: "Oral / IM"
+    notes: "Pentavalent protects against Diphtheria, Pertussis, Tetanus, Hep B, and Hib."
+
+  - vaccine: "OPV-2, Pentavalent-2, Rotavirus-2"
+    vaccine_hi: "ओपीवी-2, पेंटावेलेंट-2, रोटावायरस-2"
+    when: "10 weeks"
+    when_hi: "10 सप्ताह (2.5 माह)"
+    months_from_birth: 2.5
+    dose: "2nd dose"
+    route: "Oral / IM"
+    notes: "Given 4 weeks after 1st dose."
+
+  - vaccine: "OPV-3, Pentavalent-3, Rotavirus-3, fIPV-2, PCV-2"
+    vaccine_hi: "ओपीवी-3, पेंटावेलेंट-3, रोटावायरस-3, एफआईपीवी-2, पीसीवी-2"
+    when: "14 weeks"
+    when_hi: "14 सप्ताह (3.5 माह)"
+    months_from_birth: 3.5
+    dose: "3rd dose"
+    route: "Oral / IM"
+    notes: "Completes primary infant series."
+
+  - vaccine: "MR-1 (Measles-Rubella), JE-1, PCV Booster, Vitamin A (1st dose)"
+    vaccine_hi: "एमआर-1 (खसरा-रूबेला), जेई-1, पीसीवी बूस्टर, विटामिन ए"
+    when: "9 to 12 months"
+    when_hi: "9 से 12 माह"
+    months_from_birth: 9.0
+    dose: "1st dose / Booster"
+    route: "Subcutaneous / Oral"
+    notes: "JE in endemic districts. Vitamin A given orally."
+
+  - vaccine: "MR-2, JE-2, DPT Booster-1, OPV Booster"
+    vaccine_hi: "एमआर-2, जेई-2, डीपीटी बूस्टर-1, ओपीवी बूस्टर"
+    when: "16 to 24 months"
+    when_hi: "16 से 24 माह"
+    months_from_birth: 18.0
+    dose: "Booster"
+    route: "IM / Subcutaneous / Oral"
+    notes: "DPT booster strengthens immunity for toddlers."
+
+  - vaccine: "DPT Booster-2"
+    vaccine_hi: "डीपीटी बूस्टर-2"
+    when: "5 to 6 years"
+    when_hi: "5 से 6 वर्ष"
+    months_from_birth: 60.0
+    dose: "2nd Booster"
+    route: "Intramuscular"
+    notes: "Before child enters primary school."
+
+  - vaccine: "Td (Tetanus and adult Diphtheria)"
+    vaccine_hi: "टीडी (धनुस्तंभ व डिप्थीरिया)"
+    when: "10 years and 16 years"
+    when_hi: "10 वर्ष एवं 16 वर्ष"
+    months_from_birth: 120.0
+    dose: "Single dose"
+    route: "Intramuscular"
+    notes: "Replaces TT in national schedule."

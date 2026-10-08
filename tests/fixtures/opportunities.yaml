@@ -1,0 +1,95 @@
+# TEST FIXTURE — Opportunities
+# Label: TEST FIXTURE
+# Purpose: pytest only. Never loaded in demo UI or demo seed.
+# Location: /tests/fixtures/ (never in /data/real/)
+#
+# These are structurally valid opportunities for testing the rule engine.
+# Fields not needed for a specific test are left null.
+# Do NOT invent realistic-looking scheme names — use clearly synthetic names.
+
+_label: "TEST FIXTURE"
+
+opportunities:
+
+  - id: "tf-opp-001"
+    type: "scholarship"
+    title: "[TEST FIXTURE] OBC Youth Scholarship"
+    org: "Test Org"
+    level: "central"
+    source_url: "https://example.com/test"
+    eligibility:
+      min_age: 18
+      max_age: 30
+      education: ["secondary"]
+      category: ["OBC"]
+      gender: null
+    dates:
+      opens: "2026-10-01"
+      last_date: "2026-12-31"
+    priority: 7
+
+  - id: "tf-opp-002"
+    type: "job"
+    title: "[TEST FIXTURE] Women-Only Training Programme"
+    org: "Test Org"
+    level: "state"
+    source_url: "https://example.com/test"
+    eligibility:
+      min_age: 18
+      max_age: 40
+      education: ["primary"]
+      category: null
+      gender: ["F"]
+      is_disabled: null
+    dates:
+      opens: "2026-10-01"
+      last_date: "2027-01-31"
+    priority: 5
+
+  - id: "tf-opp-003"
+    type: "scheme"
+    title: "[TEST FIXTURE] Expired Scheme"
+    org: "Test Org"
+    level: "central"
+    source_url: "https://example.com/test"
+    eligibility:
+      min_age: 18
+      max_age: 60
+    dates:
+      last_date: "2020-01-01"    # Expired
+    priority: 3
+
+  - id: "tf-opp-004"
+    type: "training"
+    title: "[TEST FIXTURE] Disability Scheme"
+    org: "Test Org"
+    level: "district"
+    source_url: "https://example.com/test"
+    eligibility:
+      is_disabled: true
+      min_age: 15
+      max_age: 50
+    dates:
+      last_date: "2026-12-31"
+    priority: 6
+
+  - id: "tf-opp-005"
+    type: "exam"
+    title: "[TEST FIXTURE] Graduate-Level Exam"
+    org: "Test Org"
+    level: "central"
+    source_url: "https://example.com/test"
+    eligibility:
+      min_age: 21
+      max_age: 35
+      education: ["graduate"]
+      category: null
+      gender: null
+    dates:
+      last_date: "2026-11-30"
+    documents_required:
+      - name: "[TEST] Degree Certificate"
+        typical_lead_time_days: 30
+      - name: "[TEST] Domicile Certificate"
+        typical_lead_time_days: 20
+    priority: 8
